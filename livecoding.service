@@ -1,0 +1,13 @@
+[Unit]
+Description=Livecoding
+After=network.target
+
+[Service]
+ExecStart=/home/livecoding/miniconda3/bin/poetry run python -m livecoding.main
+WorkingDirectory=/home/livecoding/livecoding
+User=livecoding
+Group=livecoding
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
