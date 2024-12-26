@@ -184,7 +184,7 @@ const config = {{
 if __name__ == "__main__":
     uvicorn.run(
         app,
-        host="0.0.0.0",
+        host="localhost",
         access_log=True,
         log_config=None,
         port=5000,

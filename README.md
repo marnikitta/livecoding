@@ -41,12 +41,13 @@ Frontend:
 - [x] Frontend stats
 - [ ] Persist name in cookies or browser
 - [ ] Presence tooltips
-- [ ] call intro.js during create and handle update afterwords
+- [ ] Add favicon and the rest of the staff
 - [ ] Pretty "room not found" error
 - [ ] Focus in name field. Focus in code after room creation
 - [ ] Revising 37signals paddings and margins. Probably need to change everything to ems instead of rems
 - [ ] Stretch code editor
 - [ ] Add new document placeholder
+- [ ] call intro.js during create and handle update afterwords
 
 Backend:
 
@@ -57,8 +58,10 @@ Backend:
 - [x] Offloading plain documents
 - [x] Add greeting message
 - [ ] Remove rooms older than one week (include this message into greeting)
+- [ ] Add command to clean stale rooms
 
 Server
+- [x] Remove server from 0.0.0.0
 - [ ] Why websocket works?
 - [ ] Add ratelimiter. Stresstest it
 - [ ] Add logs rotation
