@@ -1,0 +1,146 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
+@import url(https://cdn.jsdelivr.net/npm/firacode@6.2.0/distr/fira_code.css);
+
+/*
+    Inspired by:
+    - source code of 37signals https://37signals.com/
+    - Html-centric design https://html-first.com/guidelines
+    - General guidelines https://github.com/bendc/frontend-guidelines
+*/
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+button, input, select, textarea {
+    font: inherit;
+    background: transparent;
+    border: 0;
+}
+
+:root {
+    --font-family: "Inter", Sans-Serif;
+    --font-family-mono: 'Fira Code', Monospace;
+
+    --color-white: #fff;
+    --color-grey-light: #f0f0f0;
+    --color-grey-dark: rgb(15, 21, 27);
+    --color-red: #C82829;
+    --color-yellow: #F5E642FF;
+}
+
+html {
+    font-size: 16px;
+}
+
+
+body {
+    font-family: var(--font-family), sans-serif;
+    display: flex;
+    flex-direction: column;
+    background-color: var(--color-white);
+}
+
+/* form controls */
+input,
+button {
+    border: 1px solid var(--color-grey-dark);
+    background-color: var(--color-white);
+    border-radius: 0.15rem;
+    padding: 0.2rem 0.55rem;
+}
+
+button:hover:enabled {
+    cursor: pointer;
+}
+
+button:hover:enabled {
+    background-color: var(--color-grey-light)
+}
+
+a {
+    text-decoration: underline;
+}
+
+a:hover {
+    cursor: pointer;
+}
+
+
+.announcement {
+    padding-left: 2em;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+    border-bottom: var(--color-grey-light) 1px solid;
+    align-items: center;
+}
+
+.announcement--error {
+    background-color: var(--color-red);
+    color: var(--color-white);
+}
+
+.announcement--warn {
+    background-color: var(--color-yellow);
+    color: var(--color-white);
+}
+
+.announcement__copy-link:hover {
+    color: #8959A8;
+}
+
+.header {
+    min-height: 4rem;
+    padding-left: 2rem;
+    padding-right: 2rem;
+
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    border-bottom: var(--color-grey-light) 1px solid;
+}
+
+.title {
+    display: flex;
+    column-gap: 1rem;
+    align-items: baseline;
+}
+
+.title h1 {
+    font-size: 2rem;
+    font-weight: 800;
+    letter-spacing: 0.1rem;
+    padding-bottom: 0.2rem;
+}
+
+.name-label {
+    margin-right: 1rem;
+}
+
+.name-input {
+    margin-right: 0.5rem;
+}
+
+.online-sites {
+    display: flex;
+    column-gap: 0.5rem;
+}
+
+.online-sites__site {
+    color: var(--color-white);
+    /* the same as buttons */
+    padding: 0.2rem 0.55rem;
+    border-radius: 0.15rem;
+}
+
+.cm-editor .cm-content {
+    font-family: var(--font-family-mono), monospace;
+    font-size: 1rem;
+}
+
+.cm-editor .cm-lineNumbers {
+    min-width: 2rem;
+}

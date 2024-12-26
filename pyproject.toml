@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "livecoding"
+version = "0.1.0"
+description = "Bare-minimum collaborative code editor for live interviews"
+authors = ["Nikita Marshalkin <marnikitta@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.9"
+fastapi = {extras = ["standard"], version = "^0.115.6"}
+websockets = "^14.1"
+
+
+[tool.poetry.group.dev.dependencies]
+mypy = "^1.13.0"
+flake8 = "^7.1.1"
+black = "^24.10.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
