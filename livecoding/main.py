@@ -16,6 +16,7 @@ from starlette.websockets import WebSocketDisconnect
 from livecoding.settings import settings
 from livecoding.model import WsMessage, SetSiteId, CrdtEvent
 from livecoding.room import Room, Site, RoomRepository, FullLogException
+from livecoding.utils import try_notify_systemd
 
 
 def configure_logging():
@@ -23,7 +24,7 @@ def configure_logging():
     root_logger.setLevel(logging.INFO)
 
     handler = logging.StreamHandler(sys.stdout)
-    handler.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
+    handler.setFormatter(logging.Formatter("%(levelname)s %(name)s: %(message)s"))
     root_logger.addHandler(handler)
 
 
@@ -37,6 +38,7 @@ room_repository: RoomRepository = RoomRepository(root=Path("./data"))
 async def lifespan(app: FastAPI):
     # noinspection PyAsyncCall
     asyncio.create_task(cleanup_task())
+    try_notify_systemd()
     yield
     logger.info("Terminating application. Flushing all rooms")
     room_repository.flush_everything()
