@@ -57,3 +57,9 @@ Backend:
 - [x] Offloading plain documents
 - [x] Add greeting message
 - [ ] Remove rooms older than one week (include this message into greeting)
+
+Server
+- [ ] Why websocket works?
+- [ ] Add ratelimiter. Stresstest it
+- [ ] Add logs rotation
+- [ ] Add ufw firewall

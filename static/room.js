@@ -1,7 +1,6 @@
 import {Compartment, EditorState, Transaction} from "@codemirror/state";
 
-import {EditorView, showTooltip} from "@codemirror/view";
-import {StateField} from "@codemirror/state"
+import {EditorView} from "@codemirror/view";
 import {CRDTDocument, CRDTEvent} from "./lib/document.js";
 import {allColors, defaultExtensions, getLanguageByExtension} from "./lib/theme.js";
 import {shallowRef} from "vue";
@@ -178,7 +177,7 @@ export default {
         // initial setup
         this.dispatchCrdtEvent(roomModel.events);
 
-        let socket = new WebSocket(`ws://localhost:5000/resource/room/${this.roomId}/ws?offset=${roomModel.events.length}`);
+        let socket = new WebSocket(this.getWebsocketPath(this.roomId, roomModel.events.length));
         socket.onopen = () => {
             socket.send("Hello")
             console.info("Established WebSocket connection");
@@ -348,5 +347,14 @@ export default {
                 console.error(e)
             }
         },
+        /**
+         * @param {string} roomId
+         * @param {number} offset
+         * @return {string}
+         */
+        getWebsocketPath(roomId, offset) {
+            const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+            return `${protocol}${window.location.host}/resource/room/${this.roomId}/ws?offset=${offset}`
+        }
     }
 }

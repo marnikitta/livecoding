@@ -33,7 +33,7 @@ export default {
             parent: document.getElementById("editor-view"),
         });
 
-        fetch("/intro.js").then(response => {
+        fetch("/resource/intro.js").then(response => {
             if (response.ok) {
                 response.text().then(text => {
                     this.view.dispatch({

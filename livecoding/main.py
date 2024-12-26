@@ -1,4 +1,5 @@
 import asyncio
+import datetime
 import logging
 import sys
 import time
@@ -16,7 +17,7 @@ from starlette.websockets import WebSocketDisconnect
 from livecoding.settings import settings
 from livecoding.model import WsMessage, SetSiteId, CrdtEvent
 from livecoding.room import Room, Site, RoomRepository, FullLogException
-from livecoding.utils import try_notify_systemd
+from livecoding.utils import try_notify_systemd, format_uptime
 
 
 def configure_logging():
@@ -30,6 +31,7 @@ def configure_logging():
 
 configure_logging()
 logger = logging.getLogger(__name__)
+started_at = datetime.datetime.now()
 
 room_repository: RoomRepository = RoomRepository(root=Path("./data"))
 
@@ -140,12 +142,13 @@ async def cleanup_task():
         await asyncio.sleep(10)
 
 
-@app.get("/intro.js", response_class=PlainTextResponse)
+@app.get("/resource/intro.js", response_class=PlainTextResponse)
 async def get_intro() -> str:
     active_rooms = len(room_repository.rooms)
     active_users = sum(len(room.sites) for room in room_repository.rooms.values())
     # smart way to cache for 5 seconds
     total_rooms = room_repository.total_rooms(round(time.time() / 5))
+    uptime = format_uptime(started_at, datetime.datetime.now())
 
     return f"""// Welcome to livecoding.marnikitta.com
 //  
@@ -158,7 +161,8 @@ async def get_intro() -> str:
 const stats = {{
     activeRooms: {active_rooms},
     activeUsers: {active_users},
-    totalRooms: {total_rooms}
+    totalRooms: {total_rooms},
+    uptime: "{uptime}",
 }};
 
 // Sources are available at https://github.com/marnikitta/livecoding

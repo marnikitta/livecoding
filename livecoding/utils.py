@@ -1,3 +1,4 @@
+import datetime
 import os
 import random
 
@@ -44,6 +45,17 @@ def notify_systemd(notify_socket: str) -> None:
             logger.info("Notification sent: READY=1")
     except Exception as e:
         logger.exception("Failed to notify", e)
+
+
+def format_uptime(start: datetime.datetime, end: datetime.datetime) -> str:
+    delta = end - start
+    days = delta.days
+    seconds = delta.seconds
+    hours = seconds // 3600
+    minutes = (seconds % 3600) // 60
+
+    uptime = f"{days} days, {hours:02}:{minutes:02}"
+    return uptime
 
 
 if __name__ == '__main__':

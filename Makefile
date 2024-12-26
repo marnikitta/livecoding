@@ -2,7 +2,7 @@
 # https://www.olioapps.com/blog/the-lost-art-of-the-makefile
 
 host := livecoding
-deploy_files := livecodign static poetry.toml README.md poetry.lock pyproject.toml
+deploy_files := livecoding static poetry.toml README.md poetry.lock pyproject.toml
 
 all: build
 
