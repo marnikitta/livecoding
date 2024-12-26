@@ -20,6 +20,11 @@ Build only
 make build
 ```
 
+Watch frontend
+```bash
+make watch-frontend
+```
+
 ## Todo:
 
 Frontend:
@@ -40,12 +45,14 @@ Frontend:
 - [x] Corrupt state handling
 - [x] Frontend stats
 - [ ] Persist name in cookies or browser
-- [ ] Presence tooltips
+  - Automatic reconnect
+- [ ] Mobile responsive design
 - [ ] Add favicon and the rest of the staff
 - [ ] Pretty "room not found" error
 - [ ] Focus in name field. Focus in code after room creation
 - [ ] Revising 37signals paddings and margins. Probably need to change everything to ems instead of rems
 - [ ] Stretch code editor
+- [ ] Presence tooltips
 - [ ] Add new document placeholder
 - [ ] call intro.js during create and handle update afterwords
 
@@ -58,11 +65,15 @@ Backend:
 - [x] Offloading plain documents
 - [x] Add greeting message
 - [ ] Remove rooms older than one week (include this message into greeting)
-- [ ] Add command to clean stale rooms
+- [ ] Prettify code for publishing
 
 Server
 - [x] Remove server from 0.0.0.0
-- [ ] Why websocket works?
+- [x] Why websocket works?
+- [x] Add logs rotation
+  - It happens by itself
+- [ ] Test reboot
+- [x] What is wrong with ssh settings. I moved it to 2222
 - [ ] Add ratelimiter. Stresstest it
-- [ ] Add logs rotation
-- [ ] Add ufw firewall
+- [x] Add ufw firewall
+- [ ] Overwrite 404

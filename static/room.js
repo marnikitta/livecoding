@@ -133,9 +133,9 @@ export default {
         //     }
         // })
 
-        function cursorTooltip() {
-            return [cursorTooltipField, cursorTooltipBaseTheme]
-        }
+        // function cursorTooltip() {
+        //     return [cursorTooltipField, cursorTooltipBaseTheme]
+        // }
 
         this.readonlyCompartment = new Compartment()
         let state = EditorState.create({
