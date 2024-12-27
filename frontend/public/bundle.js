@@ -39994,18 +39994,16 @@ Expected function or array of functions, received type ${typeof value}.`
     editing: "editing",
     terminated: "terminated"
   };
-  var MAX_DOCUMENT_LENGTH = 1e5;
-  var HEARTBIT_INTERVAL = 5e3;
   var room_default = {
     template: `
       <div class="announcement announcement--error"
            :class="{'announcement--error': !compactionRequired, 'announcement--warn': compactionRequired}"
            v-if="roomState === RoomState.terminated">
         <template v-if="compactionRequired">
-          Disconnected due to a large event log. All clients were disconnected for compaction. Document made read-only.
+          Disconnected due to a large event log. All clients were disconnected for compaction.
         </template>
         <template v-else>
-          Connection lost. Document is read-only. 
+          Connection lost. Document is read-only.
         </template>
         <a class="announcement__copy-link" @click="reload()">Refresh</a> the page to reconnect.
       </div>
@@ -40056,6 +40054,10 @@ Expected function or array of functions, received type ${typeof value}.`
         RoomState,
         siteId: null,
         /**
+         * @type {RoomSettings|null}
+         */
+        settings: null,
+        /**
          * @type {CRDTDocument}
          */
         document: shallowRef(new CRDTDocument()),
@@ -40102,7 +40104,8 @@ Expected function or array of functions, received type ${typeof value}.`
         return;
       }
       let roomModel = await roomResponse.json();
-      console.info(`Fetched a room with ${roomModel.events.length} events`);
+      console.info(`Fetched a room with ${roomModel.events.length} events. Settings:`, roomModel.settings);
+      this.settings = roomModel.settings;
       this.dispatchCrdtEvent(roomModel.events);
       let socket = new WebSocket(this.getWebsocketPath(this.roomId, roomModel.events.length));
       socket.onopen = () => {
@@ -40110,8 +40113,9 @@ Expected function or array of functions, received type ${typeof value}.`
         console.info("Established WebSocket connection");
         this.lastHeartbitTs = Date.now();
         let pingChecker = setInterval(() => {
-          if (Date.now() - this.lastHeartbitTs > HEARTBIT_INTERVAL * 2) {
-            console.error(`No ping received in ${HEARTBIT_INTERVAL * 2} seconds, terminating connection`);
+          let intervalMs = this.settings.heartbitInterval * 1e3;
+          if (Date.now() - this.lastHeartbitTs > intervalMs * 2) {
+            console.error(`No ping received in ${this.settings.heartbitInterval} seconds, terminating connection`);
             this.terminateEverything();
             clearInterval(pingChecker);
           }
@@ -40241,8 +40245,8 @@ Expected function or array of functions, received type ${typeof value}.`
           return true;
         }
         const newLength = transaction.newDoc.length;
-        if (transaction.docChanged && transaction.startState.doc.length < newLength && newLength > MAX_DOCUMENT_LENGTH) {
-          alert(`Your document has reached the ${MAX_DOCUMENT_LENGTH}-character limit. Please remove some text to continue`);
+        if (transaction.docChanged && transaction.startState.doc.length < newLength && newLength > this.settings.documentLimit) {
+          alert(`Your document has reached the ${this.settings.documentLimit}-character limit. Please remove some text to continue`);
           return false;
         }
         return true;

@@ -5,6 +5,12 @@ import {CRDTDocument, CRDTEvent} from "./lib/document.js";
 import {allColors, defaultExtensions, getLanguageByExtension} from "./lib/theme.js";
 import {shallowRef} from "vue";
 
+/**
+ * @typedef {object} RoomSettings
+ * @property {number} heartbitInterval
+ * @property {number} documentLimit
+ */
+
 const RoomState = {
     connecting: 'connecting',
     waitingForName: 'waitingForName',
@@ -12,8 +18,6 @@ const RoomState = {
     terminated: 'terminated'
 };
 
-const MAX_DOCUMENT_LENGTH = 100_000;
-const HEARTBIT_INTERVAL = 5000;
 
 export default {
     template: `
@@ -24,7 +28,7 @@ export default {
           Disconnected due to a large event log. All clients were disconnected for compaction.
         </template>
         <template v-else>
-          Connection lost. Document is read-only. 
+          Connection lost. Document is read-only.
         </template>
         <a class="announcement__copy-link" @click="reload()">Refresh</a> the page to reconnect.
       </div>
@@ -75,6 +79,10 @@ export default {
             RoomState,
             siteId: null,
             /**
+             * @type {RoomSettings|null}
+             */
+            settings: null,
+            /**
              * @type {CRDTDocument}
              */
             document: shallowRef(new CRDTDocument()),
@@ -124,7 +132,8 @@ export default {
             return
         }
         let roomModel = await roomResponse.json()
-        console.info(`Fetched a room with ${roomModel.events.length} events`)
+        console.info(`Fetched a room with ${roomModel.events.length} events. Settings:`, roomModel.settings)
+        this.settings = roomModel.settings
 
         // initial setup
         this.dispatchCrdtEvent(roomModel.events);
@@ -136,8 +145,9 @@ export default {
 
             this.lastHeartbitTs = Date.now()
             let pingChecker = setInterval(() => {
-                if (Date.now() - this.lastHeartbitTs > HEARTBIT_INTERVAL * 2) {
-                    console.error(`No ping received in ${HEARTBIT_INTERVAL * 2} seconds, terminating connection`)
+                let intervalMs = this.settings.heartbitInterval * 1000
+                if (Date.now() - this.lastHeartbitTs > intervalMs * 2) {
+                    console.error(`No ping received in ${this.settings.heartbitInterval} seconds, terminating connection`)
                     this.terminateEverything()
                     clearInterval(pingChecker)
                 }
@@ -274,9 +284,9 @@ export default {
             const newLength = transaction.newDoc.length
             if (transaction.docChanged
                 && transaction.startState.doc.length < newLength
-                && newLength > MAX_DOCUMENT_LENGTH) {
+                && newLength > this.settings.documentLimit) {
                 // console.log("Document is way too long")
-                alert(`Your document has reached the ${MAX_DOCUMENT_LENGTH}-character limit. Please remove some text to continue`)
+                alert(`Your document has reached the ${this.settings.documentLimit}-character limit. Please remove some text to continue`)
                 return false;
             }
 

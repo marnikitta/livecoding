@@ -49,9 +49,15 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 
+class RoomSettings(BaseModel):
+    documentLimit: int = settings.document_size_limit
+    heartbitInterval: int = settings.heartbit_interval
+
+
 class RoomModel(BaseModel):
     roomId: str
     events: list[CrdtEvent]
+    settings: RoomSettings = RoomSettings()
 
 
 @app.post("/resource/room")
