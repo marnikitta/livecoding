@@ -83,7 +83,7 @@ a:hover {
 
 .announcement--warn {
     background-color: var(--color-yellow);
-    color: var(--color-white);
+    color: var(--color-grey-dark);
 }
 
 .header {

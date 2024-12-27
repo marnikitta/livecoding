@@ -51,3 +51,19 @@ class WsMessage(BaseModel):
     crdtEvents: Optional[list[CrdtEvent]] = None
     heartbit: Optional[bool] = None
     compactionRequired: Optional[bool] = None
+
+
+def test_memory_usage():
+    import tracemalloc
+    tracemalloc.start()
+
+    events = []
+    for i in range(500_000):
+        events.append(CrdtEvent(type=EventType.insert, gid=GlobalId(counter=i, siteId=0), char="a"))
+
+    current, peak = tracemalloc.get_traced_memory()
+    print(current >> 20, peak >> 20)
+
+
+if __name__ == '__main__':
+    test_memory_usage()

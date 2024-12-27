@@ -24,7 +24,7 @@ export default {
           Disconnected due to a large event log. All clients were disconnected for compaction.
         </template>
         <template v-else>
-          Connection lost.
+          Connection lost. Document is read-only. 
         </template>
         <a class="announcement__copy-link" @click="reload()">Refresh</a> the page to reconnect.
       </div>

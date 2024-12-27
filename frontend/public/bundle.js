@@ -40002,10 +40002,10 @@ Expected function or array of functions, received type ${typeof value}.`
            :class="{'announcement--error': !compactionRequired, 'announcement--warn': compactionRequired}"
            v-if="roomState === RoomState.terminated">
         <template v-if="compactionRequired">
-          Disconnected due to a large event log. All clients were disconnected for compaction.
+          Disconnected due to a large event log. All clients were disconnected for compaction. Document made read-only.
         </template>
         <template v-else>
-          Connection lost.
+          Connection lost. Document is read-only. 
         </template>
         <a class="announcement__copy-link" @click="reload()">Refresh</a> the page to reconnect.
       </div>
