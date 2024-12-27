@@ -25,7 +25,7 @@ lint: .venv
 watch_front: node_modules
 	node_modules/.bin/esbuild frontend/app.js --bundle --sourcemap --outfile=$(bundle_path) --watch
 
-$(bundle_path): node_modules
+$(bundle_path): node_modules FORCE
 	node_modules/.bin/esbuild frontend/app.js --minify --bundle --outfile=$(bundle_path)
 
 node_modules: package.json package-lock.json
@@ -48,5 +48,7 @@ deploy: push
 stop-deploy:
 	ssh -T $(host) "systemctl --user stop livecoding.service"
 	ssh -T $(host) "journalctl --user-unit=livecoding.service --no-pager | tail -n 20"
+
+FORCE:
 
 .PHONY: all build clean run lint watch_front clean deploy stop-deploy

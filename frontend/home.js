@@ -50,7 +50,7 @@ export default {
             }).then(response => {
                 if (response.ok) {
                     response.json().then(data => {
-                        this.$router.push(`/room/${data.roomId}`);
+                        this.$router.push(`/room/${data.roomId}.py`);
                     });
                 }
             });
