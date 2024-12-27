@@ -36,7 +36,7 @@ export default {
         <div class="online-sites">
           <div class="online-sites__site" :style="{background: site.color}"
                v-for="[s, site] in sites" :key="s">
-            {{ site.name }}<span v-if="siteId === s"> (you)</span>
+            {{ site.name }}<span v-if="siteId === s">&nbsp;(you)</span>
           </div>
         </div>
       </header>

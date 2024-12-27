@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Annotated
 
 import uvicorn
-from fastapi import FastAPI, WebSocket, HTTPException, Depends
+from fastapi import FastAPI, WebSocket, HTTPException, Depends, APIRouter
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.responses import FileResponse, PlainTextResponse
@@ -47,8 +47,6 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
-
-app.mount("/static", app=StaticFiles(directory="./static"), name="static")
 
 
 class RoomModel(BaseModel):
@@ -124,17 +122,6 @@ async def websocket_endpoint(room: Annotated[Room, Depends(room_provider)],
         await room.disconnect(site_id)
 
 
-@app.get('/')
-async def index():
-    return FileResponse('static/index.html')
-
-
-@app.get('/room/{room_id}')
-async def room_index(room_id: str):
-    print(room_id)
-    return FileResponse('static/index.html')
-
-
 async def cleanup_task():
     while True:
         room_repository.flush_everything()
@@ -180,6 +167,19 @@ const config = {{
 //  e.g. /room/emutilusejaxok.py for Python
 """
 
+
+@app.get('/')
+async def index():
+    return FileResponse('static/index.html')
+
+
+@app.get('/room/{room_id}')
+async def room_index(room_id: str):
+    print(room_id)
+    return FileResponse('static/index.html')
+
+
+app.mount("/", app=StaticFiles(directory="./static"))
 
 if __name__ == "__main__":
     uvicorn.run(

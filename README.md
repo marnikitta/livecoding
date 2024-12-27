@@ -64,6 +64,7 @@ Backend:
 - [x] Compaction and materialization (reimplement algorithm). Gzip
 - [x] Offloading plain documents
 - [x] Add greeting message
+- [ ] Benchmark file sizes
 - [ ] Remove rooms older than one week (include this message into greeting)
 - [ ] Prettify code for publishing
 

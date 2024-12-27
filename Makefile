@@ -34,7 +34,7 @@ clean:
 
 # Deployment scripts
 push: build lint
-	ssh -T $(host) "mkdir -p ~/livecoding"
+	#ssh -T $(host) "mkdir -p ~/livecoding"
 	rsync --delete --verbose --archive --compress --rsh=ssh $(deploy_files) $(host):~/livecoding
 
 deploy: push
