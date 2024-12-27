@@ -12,6 +12,7 @@
     margin: 0;
     padding: 0;
     box-sizing: border-box;
+    -webkit-text-size-adjust: none;
 }
 
 button, input, select, textarea {
@@ -70,7 +71,7 @@ a:hover {
 
 
 .announcement {
-    padding-left: 2em;
+    padding-left: 1em;
     padding-top: 0.5rem;
     padding-bottom: 0.5rem;
     border-bottom: var(--color-grey-light) 1px solid;
@@ -87,14 +88,9 @@ a:hover {
     color: var(--color-white);
 }
 
-.announcement__copy-link:hover {
-    color: #8959A8;
-}
-
 .header {
-    min-height: 4rem;
-    padding-left: 2rem;
-    padding-right: 2rem;
+    padding-left: 1rem;
+    padding-right: 1rem;
 
     display: flex;
     justify-content: space-between;
@@ -103,10 +99,21 @@ a:hover {
     border-bottom: var(--color-grey-light) 1px solid;
 }
 
+@media (max-width: 64em) {
+    .header {
+        display: block;
+        /*display: flex;*/
+        /*flex-direction: column;*/
+        /*align-items: start*/
+    }
+}
+
 .title {
     display: flex;
     column-gap: 1rem;
     align-items: baseline;
+    margin-top: 0.7rem;
+    margin-bottom: 0.5rem;
 }
 
 .title h1 {
@@ -116,17 +123,13 @@ a:hover {
     padding-bottom: 0.2rem;
 }
 
-.name-label {
-    margin-right: 1rem;
-}
-
-.name-input {
-    margin-right: 0.5rem;
-}
-
 .online-sites {
     display: flex;
     column-gap: 0.5rem;
+    row-gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
 }
 
 .online-sites__site {
@@ -136,9 +139,17 @@ a:hover {
     border-radius: 0.15rem;
 }
 
+
+.name-label {
+    margin-right: 1rem;
+}
+
+.name-input {
+    margin-right: 0.5rem;
+}
+
 .cm-editor .cm-content {
     font-family: var(--font-family-mono), monospace;
-    font-size: 1rem;
 }
 
 .cm-editor .cm-lineNumbers {

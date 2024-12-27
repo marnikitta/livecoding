@@ -21,12 +21,12 @@ export default {
            :class="{'announcement--error': !compactionRequired, 'announcement--warn': compactionRequired}"
            v-if="roomState === RoomState.terminated">
         <template v-if="compactionRequired">
-          Disconnected due to a large event log. All clients were disconnected for compaction. Refresh to reconnect.
+          Disconnected due to a large event log. All clients were disconnected for compaction.
         </template>
         <template v-else>
-          Connection lost. <a class="announcement__copy-link" @click="copyText">Copy your work</a> to prevent losing it.
-          Refresh the page to reconnect.
+          Connection lost.
         </template>
+        <a class="announcement__copy-link" @click="reload()">Refresh</a> the page to reconnect.
       </div>
       <header class="header">
         <div class="title">
@@ -218,6 +218,7 @@ export default {
             this.socket.send(JSON.stringify({siteHello: {"name": name, "siteId": this.siteId}}))
             this.setReadonly(false)
             this.roomState = RoomState.editing
+            sessionStorage.setItem(this.roomId, JSON.stringify({name}));
         },
         terminateEverything(compactionRequired = false) {
             if (this.roomState === RoomState.terminated) {
@@ -248,13 +249,18 @@ export default {
                 this.siteId = msg.setSiteId.siteId;
                 console.info("Site ID set to", this.siteId)
                 this.roomState = RoomState.waitingForName
+
+                if (sessionStorage.hasOwnProperty(this.roomId)) {
+                    let {name} = JSON.parse(sessionStorage.getItem(this.roomId))
+                    this.enterRoom(name)
+                }
             } else if ("crdtEvents" in msg) {
                 this.dispatchCrdtEvent(msg.crdtEvents);
             } else if ("siteHello" in msg) {
                 console.info("New site", msg.siteHello)
                 this.sites.set(msg.siteHello.siteId, {
                     "name": msg.siteHello.name,
-                    "color": allColors[this.sites.size % allColors.length]
+                    "color": allColors[msg.siteHello.siteId % allColors.length]
                 })
             } else if ("siteDisconnected" in msg) {
                 console.info("Site disconnected", msg.siteDisconnected)
@@ -337,16 +343,6 @@ export default {
                 }
             }
         },
-        async copyText() {
-            try {
-                let text = this.view.state.doc.toString()
-                await navigator.clipboard.writeText(text);
-                alert("Copied");
-            } catch (e) {
-                alert("Cannot copy");
-                console.error(e)
-            }
-        },
         /**
          * @param {string} roomId
          * @param {number} offset
@@ -355,6 +351,9 @@ export default {
         getWebsocketPath(roomId, offset) {
             const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
             return `${protocol}${window.location.host}/resource/room/${this.roomId}/ws?offset=${offset}`
+        },
+        reload() {
+            window.location.reload()
         }
     }
 }

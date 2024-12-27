@@ -44,9 +44,8 @@ Frontend:
 - [x] Websocket disconnect handling
 - [x] Corrupt state handling
 - [x] Frontend stats
-- [ ] Persist name in cookies or browser
-  - Automatic reconnect
-- [ ] Mobile responsive design
+- [x] Persist name in cookies or browser
+- [x] Mobile responsive design
 - [ ] Add favicon and the rest of the staff
 - [ ] Pretty "room not found" error
 - [ ] Focus in name field. Focus in code after room creation
@@ -55,6 +54,7 @@ Frontend:
 - [ ] Presence tooltips
 - [ ] Add new document placeholder
 - [ ] call intro.js during create and handle update afterwords
+- [ ] Automatic reconnect
 
 Backend:
 
