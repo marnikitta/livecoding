@@ -135,9 +135,8 @@ async def get_intro() -> str:
 // 1. Create a new room
 // 2. Share the link with friends
 // 3. Start coding together!
-//
-// Happy coding!
 
+// Real-time stats
 const stats = {{
     activeRooms: {active_rooms},
     activeUsers: {active_users},
@@ -149,11 +148,12 @@ const stats = {{
 // Kudos to Bartosz Sypytkowski for CRDT primer https://www.bartoszsypytkowski.com/operation-based-crdts-arrays-1
 // Inspired by https://code.yandex-team.ru
 
+// Server config
 const config = {{
     heartbitInterval: {settings.heartbit_interval},
-    hardMaxEventsLog: {settings.hard_max_events_log},
-    compactionMaxEventsLog: {settings.compaction_max_events_log},
     documentSizeLimit: {settings.document_size_limit},
+    compactionMaxEventsLog: {settings.compaction_max_events_log},
+    hardMaxEventsLog: {settings.hard_max_events_log},
 }};
 
 // P.S. To change code highlighting, change file extension in the URL,
