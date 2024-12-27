@@ -9,7 +9,7 @@ from fastapi.websockets import WebSocket
 from starlette.websockets import WebSocketState
 
 from livecoding.document import CrdtDocument
-from livecoding.model import WsMessage, SiteDisconnected, CrdtEvent, SiteHello, GlobalId, EventType
+from livecoding.model import WsMessage, SiteDisconnected, CrdtEventModel, SiteHello, GlobalIdModel, EventType
 from livecoding.settings import settings
 from livecoding.utils import generate_phonetic_name
 
@@ -19,8 +19,24 @@ logger = logging.getLogger(__name__)
 class Site:
     def __init__(self, site_id: int, websocket: WebSocket):
         self.site_id = site_id
-        self.websocket = websocket
         self.name: Optional[str] = None
+        self._websocket = websocket
+
+    async def send_message(self, message: WsMessage):
+        await self._websocket.send_text(message.model_dump_json(exclude_none=True))
+
+    def __del__(self):
+        self.close()
+
+    async def close(self):
+        try:
+            await self._websocket.close()
+        except:
+            pass
+
+    @property
+    def socket_disconnected(self) -> bool:
+        return self._websocket.client_state == WebSocketState.DISCONNECTED
 
 
 class FullLogException(Exception):
@@ -33,7 +49,7 @@ class Room:
     def __init__(self, room_id: str):
         self.room_id = room_id
         self.sites: dict[int, Site] = {}
-        self.events: list[CrdtEvent] = []
+        self.events: list[CrdtEventModel] = []
         self.document = CrdtDocument()
 
     @staticmethod
@@ -41,8 +57,8 @@ class Room:
         room = Room(room_id)
         prev_gid = None
         for i, t in enumerate(text):
-            gid = GlobalId(counter=i, siteId=RoomRepository.UTIL_SITE_ID)
-            room._append_events([CrdtEvent(type=EventType.insert, gid=gid, afterGid=prev_gid, char=t)])
+            gid = GlobalIdModel(counter=i, siteId=RoomRepository.UTIL_SITE_ID)
+            room._append_events([CrdtEventModel(type=EventType.insert, gid=gid, afterGid=prev_gid, char=t)])
             prev_gid = gid
         materialized_text = room.materialize()
         assert materialized_text == text
@@ -65,15 +81,14 @@ class Room:
 
         for i in range(offset, len(self.events), Room.EVENTS_BATCH_SIZE):
             msg = WsMessage(crdtEvents=self.events[i:i + Room.EVENTS_BATCH_SIZE])
-            await site.websocket.send_text(msg.model_dump_json(exclude_none=True))
+            await site.send_message(msg)
 
         for s in self.sites.values():
             if s.name is None:
                 continue
-            await site.websocket.send_text(WsMessage(siteHello=SiteHello(siteId=s.site_id, name=s.name))
-                                           .model_dump_json(exclude_none=True))
+            await site.send_message(WsMessage(siteHello=SiteHello(siteId=s.site_id, name=s.name)))
 
-    async def apply_events(self, crdt_events: list[CrdtEvent], sender: Optional[int] = None):
+    async def apply_events(self, crdt_events: list[CrdtEventModel], sender: Optional[int] = None):
         if sender is not None:
             for event in crdt_events:
                 if event.type == EventType.insert:
@@ -82,7 +97,7 @@ class Room:
         self._append_events(crdt_events)
         await self.broadcast(WsMessage(crdtEvents=crdt_events), sender)
 
-    def _append_events(self, crdt_events: list[CrdtEvent]):
+    def _append_events(self, crdt_events: list[CrdtEventModel]):
         if len(self.events) + len(crdt_events) > settings.hard_max_events_log:
             raise FullLogException(
                 f"Reached hard limit. Current size: {len(self.events)}, new events: {len(crdt_events)}")
@@ -102,8 +117,7 @@ class Room:
                 continue
 
             try:
-                value = message.model_dump_json(exclude_none=True)
-                await site.websocket.send_text(value)
+                await site.send_message(message)
             except Exception:
                 logger.warning(f"Site {site.site_id} is not connected to room {self.room_id}")
                 await self.disconnect(site.site_id)
@@ -112,10 +126,7 @@ class Room:
         if site_id not in self.sites:
             return
 
-        try:
-            await self.sites[site_id].websocket.close()
-        except:
-            pass
+        await self.sites[site_id].close()
 
         del self.sites[site_id]
         logger.info(f"Site {site_id} disconnected from the room {self.room_id}")
@@ -124,7 +135,7 @@ class Room:
 
     async def clean_connections(self):
         for site in list(self.sites.values()):
-            if site.websocket.client_state == WebSocketState.DISCONNECTED:
+            if site.socket_disconnected:
                 await self.disconnect(site.site_id)
 
     def has_active_sites(self):

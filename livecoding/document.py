@@ -1,16 +1,15 @@
+import dataclasses
 from typing import Optional
 
-from livecoding.model import GlobalId, CrdtEvent, EventType
+from livecoding.model import GlobalIdModel, CrdtEventModel, EventType
 
 
+@dataclasses.dataclass(slots=True)
 class CharEntry:
-    def __init__(self,
-                 gid: GlobalId,
-                 char: str):
-        self.gid = gid
-        self.char = char
-        self.visible = True
-        self.next_entry: Optional[CharEntry] = None
+    gid: GlobalIdModel
+    char: str
+    visible: bool = True
+    next_entry: Optional["CharEntry"] = None
 
 
 class CrdtDocument:
@@ -18,7 +17,7 @@ class CrdtDocument:
         self.head: Optional[CharEntry] = None
         self.gid_to_entry: dict[tuple[int, int], CharEntry] = {}
 
-    def apply(self, event: CrdtEvent):
+    def apply(self, event: CrdtEventModel):
         if event.type == EventType.delete:
             self.gid_to_entry[event.gid.to_tuple()].visible = False
             return
@@ -65,18 +64,18 @@ class CrdtDocument:
 
 def test_document():
     document = CrdtDocument()
-    document.apply(CrdtEvent(type=EventType.insert, gid=GlobalId(counter=0, siteId=1), char="a"))
+    document.apply(CrdtEventModel(type=EventType.insert, gid=GlobalIdModel(counter=0, siteId=1), char="a"))
     assert document.materialize() == "a"
 
-    document.apply(CrdtEvent(type=EventType.insert, gid=GlobalId(counter=1, siteId=1), char="b",
-                             afterGid=GlobalId(counter=0, siteId=1)))
+    document.apply(CrdtEventModel(type=EventType.insert, gid=GlobalIdModel(counter=1, siteId=1), char="b",
+                                  afterGid=GlobalIdModel(counter=0, siteId=1)))
     assert document.materialize() == "ab"
 
-    document.apply(CrdtEvent(type=EventType.insert, gid=GlobalId(counter=2, siteId=1), char="c",
-                             afterGid=None))
+    document.apply(CrdtEventModel(type=EventType.insert, gid=GlobalIdModel(counter=2, siteId=1), char="c",
+                                  afterGid=None))
     assert document.materialize() == "cab"
 
-    document.apply(CrdtEvent(type=EventType.delete, gid=GlobalId(counter=0, siteId=1)))
+    document.apply(CrdtEventModel(type=EventType.delete, gid=GlobalIdModel(counter=0, siteId=1)))
     assert document.materialize() == "cb"
 
 

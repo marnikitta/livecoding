@@ -15,7 +15,7 @@ from starlette.responses import FileResponse, PlainTextResponse
 from starlette.websockets import WebSocketDisconnect
 
 from livecoding.settings import settings
-from livecoding.model import WsMessage, SetSiteId, CrdtEvent
+from livecoding.model import WsMessage, SetSiteId, CrdtEventModel
 from livecoding.room import Room, Site, RoomRepository, FullLogException
 from livecoding.utils import try_notify_systemd, format_uptime
 
@@ -56,7 +56,7 @@ class RoomSettings(BaseModel):
 
 class RoomModel(BaseModel):
     roomId: str
-    events: list[CrdtEvent]
+    events: list[CrdtEventModel]
     settings: RoomSettings = RoomSettings()
 
 

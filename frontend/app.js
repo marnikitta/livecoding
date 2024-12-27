@@ -4,6 +4,7 @@ import {runAllTests} from "./lib/test_document.js";
 
 // Such a weird import is required for pure js templates
 // See https://jvns.ca/blog/2021/11/15/esbuild-vue/ for details
+// noinspection JSFileReferences
 import {createApp} from "vue/dist/vue.esm-bundler.js";
 
 import {createRouter, createWebHistory, RouterView} from "vue-router";
