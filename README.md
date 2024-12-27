@@ -46,10 +46,10 @@ Frontend:
 - [x] Frontend stats
 - [x] Persist name in cookies or browser
 - [x] Mobile responsive design
+- [x] Revising 37signals paddings and margins. Probably need to change everything to ems instead of rems
+- [x] Focus in name field. Focus in code after room creation
 - [ ] Add favicon and the rest of the staff
 - [ ] Pretty "room not found" error
-- [ ] Focus in name field. Focus in code after room creation
-- [ ] Revising 37signals paddings and margins. Probably need to change everything to ems instead of rems
 - [ ] Stretch code editor
 - [ ] Presence tooltips
 - [ ] Add new document placeholder

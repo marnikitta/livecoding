@@ -33,7 +33,7 @@ export default {
           <h1>Live coding editor</h1>
         </div>
 
-        <div class="online-sites">
+        <div class="online-sites" v-if="sites.size > 0">
           <div class="online-sites__site" :style="{background: site.color}"
                v-for="[s, site] in sites" :key="s">
             {{ site.name }}<span v-if="siteId === s">&nbsp;(you)</span>
@@ -41,9 +41,12 @@ export default {
         </div>
       </header>
 
+      <div class="announcement" v-if="roomState === RoomState.connecting">
+        Connecting...
+      </div>
+
       <div class="announcement"
-           v-if="roomState === RoomState.waitingForName 
-           || roomState === RoomState.connecting">
+           v-if="roomState === RoomState.waitingForName">
         <form @submit.prevent="enterRoom(nameInput)">
           <label class="name-label" for="name">To edit the document, introduce yourself</label>
           <input type="text" id="name"
@@ -253,6 +256,8 @@ export default {
                 if (sessionStorage.hasOwnProperty(this.roomId)) {
                     let {name} = JSON.parse(sessionStorage.getItem(this.roomId))
                     this.enterRoom(name)
+                } else {
+                    this.roomState = RoomState.waitingForName
                 }
             } else if ("crdtEvents" in msg) {
                 this.dispatchCrdtEvent(msg.crdtEvents);
