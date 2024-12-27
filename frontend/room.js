@@ -78,7 +78,6 @@ export default {
              * @type {CRDTDocument}
              */
             document: shallowRef(new CRDTDocument()),
-            overflowed: false,
             nameInput: null,
             sites: new Map(),
             lastHeartbitTs: null,
@@ -88,66 +87,16 @@ export default {
     async mounted() {
         console.log("Room mounted", {roomId: this.roomId, extension: this.extension})
 
-        // const cursorTooltipField = StateField.define({
-        //     create: getCursorTooltips,
-        //
-        //     update(tooltips, tr) {
-        //         if (!tr.docChanged && !tr.selection) return tooltips
-        //         return getCursorTooltips(tr.state)
-        //     },
-        //
-        //     provide: f => showTooltip.computeN([f], state => state.field(f))
-        // })
-        //
-        // function getCursorTooltips(state) {
-        //     return state.selection.ranges
-        //         .filter(range => range.empty)
-        //         .map(range => {
-        //             let line = state.doc.lineAt(range.head)
-        //             let text = line.number + ":" + (range.head - line.from)
-        //             return {
-        //                 pos: range.head,
-        //                 above: true,
-        //                 strictSide: true,
-        //                 arrow: true,
-        //                 create: () => {
-        //                     let dom = document.createElement("div")
-        //                     dom.className = "cm-tooltip-cursor"
-        //                     dom.textContent = text
-        //                     return {dom}
-        //                 }
-        //             }
-        //         })
-        // }
-        //
-        // const cursorTooltipBaseTheme = EditorView.baseTheme({
-        //     ".cm-tooltip.cm-tooltip-cursor": {
-        //         backgroundColor: "#66b",
-        //         color: "white",
-        //         border: "none",
-        //         padding: "2px 7px",
-        //         borderRadius: "4px",
-        //         "& .cm-tooltip-arrow:before": {
-        //             borderTopColor: "#66b"
-        //         },
-        //         "& .cm-tooltip-arrow:after": {
-        //             borderTopColor: "transparent"
-        //         }
-        //     }
-        // })
-
-        // function cursorTooltip() {
-        //     return [cursorTooltipField, cursorTooltipBaseTheme]
-        // }
-
         this.readonlyCompartment = new Compartment()
+        this.editableCompartment = new Compartment()
+
         let state = EditorState.create({
             doc: this.document.getText(),
             extensions: [
+                this.editableCompartment.of(EditorView.editable.of(false)),
+                this.readonlyCompartment.of(EditorState.readOnly.of(true)),
                 ...defaultExtensions,
-                // ...cursorTooltip(),
                 getLanguageByExtension(this.extension),
-                this.readonlyCompartment.of(EditorView.editable.of(false)),
                 EditorView.updateListener.of(update => {
                     try {
                         this.onViewUpdate(update)
@@ -282,7 +231,10 @@ export default {
         },
         setReadonly(readonly) {
             this.view.dispatch({
-                effects: this.readonlyCompartment.reconfigure(EditorView.editable.of(!readonly))
+                effects:
+                    [this.editableCompartment.reconfigure(EditorView.editable.of(!readonly)),
+                        this.readonlyCompartment.reconfigure(EditorState.readOnly.of(readonly))
+                    ]
             })
         },
         /**
@@ -325,8 +277,6 @@ export default {
                 && newLength > MAX_DOCUMENT_LENGTH) {
                 // console.log("Document is way too long")
                 alert(`Your document has reached the ${MAX_DOCUMENT_LENGTH}-character limit. Please remove some text to continue`)
-
-                this.overflowed = true;
                 return false;
             }
 

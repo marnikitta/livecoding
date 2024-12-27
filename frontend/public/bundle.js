@@ -40059,7 +40059,6 @@ Expected function or array of functions, received type ${typeof value}.`
          * @type {CRDTDocument}
          */
         document: shallowRef(new CRDTDocument()),
-        overflowed: false,
         nameInput: null,
         sites: /* @__PURE__ */ new Map(),
         lastHeartbitTs: null,
@@ -40069,13 +40068,14 @@ Expected function or array of functions, received type ${typeof value}.`
     async mounted() {
       console.log("Room mounted", { roomId: this.roomId, extension: this.extension });
       this.readonlyCompartment = new Compartment();
+      this.editableCompartment = new Compartment();
       let state = EditorState.create({
         doc: this.document.getText(),
         extensions: [
+          this.editableCompartment.of(EditorView.editable.of(false)),
+          this.readonlyCompartment.of(EditorState.readOnly.of(true)),
           ...defaultExtensions,
-          // ...cursorTooltip(),
           getLanguageByExtension(this.extension),
-          this.readonlyCompartment.of(EditorView.editable.of(false)),
           EditorView.updateListener.of((update) => {
             try {
               this.onViewUpdate(update);
@@ -40201,7 +40201,10 @@ Expected function or array of functions, received type ${typeof value}.`
       },
       setReadonly(readonly2) {
         this.view.dispatch({
-          effects: this.readonlyCompartment.reconfigure(EditorView.editable.of(!readonly2))
+          effects: [
+            this.editableCompartment.reconfigure(EditorView.editable.of(!readonly2)),
+            this.readonlyCompartment.reconfigure(EditorState.readOnly.of(readonly2))
+          ]
         });
       },
       /**
@@ -40240,7 +40243,6 @@ Expected function or array of functions, received type ${typeof value}.`
         const newLength = transaction.newDoc.length;
         if (transaction.docChanged && transaction.startState.doc.length < newLength && newLength > MAX_DOCUMENT_LENGTH) {
           alert(`Your document has reached the ${MAX_DOCUMENT_LENGTH}-character limit. Please remove some text to continue`);
-          this.overflowed = true;
           return false;
         }
         return true;
