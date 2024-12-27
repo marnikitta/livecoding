@@ -2,13 +2,14 @@
 # https://www.olioapps.com/blog/the-lost-art-of-the-makefile
 
 host := livecoding
-deploy_files := livecoding static poetry.toml README.md poetry.lock pyproject.toml
+bundle_path := frontend/public/bundle.js
+deploy_files := livecoding frontend poetry.toml README.md poetry.lock pyproject.toml
 
 all: build
 
-build: .venv static/dist/bundle.js
+build: .venv $(bundle_path)
 
-run: .venv static/dist/bundle.js
+run: .venv $(bundle_path)
 	poetry run python -m livecoding.main
 
 lint: .venv
@@ -19,10 +20,10 @@ lint: .venv
 
 # Frontend
 watch_front: node_modules
-	node_modules/.bin/esbuild static/app.js --bundle --sourcemap --outfile=static/dist/bundle.js --watch
+	node_modules/.bin/esbuild frontend/app.js --bundle --sourcemap --outfile=$(bundle_path) --watch
 
-static/dist/bundle.js: node_modules
-	node_modules/.bin/esbuild static/app.js --minify --bundle --outfile=static/dist/bundle.js
+$(bundle_path): node_modules
+	node_modules/.bin/esbuild frontend/app.js --minify --bundle --outfile=$(bundle_path)
 
 node_modules: package.json package-lock.json
 	npm install

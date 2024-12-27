@@ -170,16 +170,16 @@ const config = {{
 
 @app.get('/')
 async def index():
-    return FileResponse('static/index.html')
+    return FileResponse('frontend/index.html')
 
 
 @app.get('/room/{room_id}')
 async def room_index(room_id: str):
     print(room_id)
-    return FileResponse('static/index.html')
+    return FileResponse('frontend/index.html')
 
 
-app.mount("/", app=StaticFiles(directory="./static"))
+app.mount("/public", app=StaticFiles(directory="./frontend/public"))
 
 if __name__ == "__main__":
     uvicorn.run(

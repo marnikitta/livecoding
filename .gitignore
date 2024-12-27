@@ -2,4 +2,3 @@ node_modules
 .idea
 data
 __pycache__
-static/dist
