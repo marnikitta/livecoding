@@ -8,7 +8,7 @@ from typing import Optional
 from fastapi.websockets import WebSocket
 from starlette.websockets import WebSocketState
 
-from livecoding.document import CrdtDocument
+from livecoding.document import CrdtDocument, CrdtEventInternal
 from livecoding.model import WsMessage, SiteDisconnected, CrdtEventModel, SiteHello, GlobalIdModel, EventType
 from livecoding.settings import settings
 from livecoding.utils import generate_phonetic_name
@@ -31,7 +31,7 @@ class Site:
     async def close(self):
         try:
             await self._websocket.close()
-        except:
+        except Exception:
             pass
 
     @property
@@ -44,13 +44,11 @@ class FullLogException(Exception):
 
 
 class Room:
-    EVENTS_BATCH_SIZE = 100
-
     def __init__(self, room_id: str):
         self.room_id = room_id
         self.sites: dict[int, Site] = {}
-        self.events: list[CrdtEventModel] = []
-        self.document = CrdtDocument()
+        self._events: list[CrdtEventInternal] = []
+        self._document = CrdtDocument()
 
     @staticmethod
     def create_from_text(room_id: str, text: str):
@@ -66,7 +64,7 @@ class Room:
 
     @property
     def max_site_id(self) -> int:
-        max_gid = max([e.gid.siteId for e in self.events], default=0)
+        max_gid = max([e.gid.siteId for e in self._events], default=0)
         return max(max(self.sites.keys(), default=0), max_gid) + 1
 
     async def connect(self, site: Site, offset: int = 0):
@@ -79,14 +77,15 @@ class Room:
         self.sites[site.site_id] = site
         logger.info(f"Site {site.site_id} connected to room {self.room_id}")
 
-        for i in range(offset, len(self.events), Room.EVENTS_BATCH_SIZE):
-            msg = WsMessage(crdtEvents=self.events[i:i + Room.EVENTS_BATCH_SIZE])
-            await site.send_message(msg)
+        await site.send_message(WsMessage(crdtEvents=self.get_events(offset)))
 
         for s in self.sites.values():
             if s.name is None:
                 continue
             await site.send_message(WsMessage(siteHello=SiteHello(siteId=s.site_id, name=s.name)))
+
+    def get_events(self, offset: int = 0) -> list[CrdtEventModel]:
+        return [CrdtEventModel.from_internal(e) for e in self._events[offset:]]
 
     async def apply_events(self, crdt_events: list[CrdtEventModel], sender: Optional[int] = None):
         if sender is not None:
@@ -98,13 +97,20 @@ class Room:
         await self.broadcast(WsMessage(crdtEvents=crdt_events), sender)
 
     def _append_events(self, crdt_events: list[CrdtEventModel]):
-        if len(self.events) + len(crdt_events) > settings.hard_max_events_log:
+        if len(self._events) + len(crdt_events) > settings.hard_max_events_log:
             raise FullLogException(
-                f"Reached hard limit. Current size: {len(self.events)}, new events: {len(crdt_events)}")
+                f"Reached hard limit. Current size: {len(self._events)}, new events: {len(crdt_events)}"
+            )
 
-        self.events += crdt_events
-        for event in crdt_events:
-            self.document.apply(event)
+        internal_events = [e.to_internal() for e in crdt_events]
+
+        self._events += internal_events
+        for event in internal_events:
+            self._document.apply(event)
+
+    @property
+    def events_len(self) -> int:
+        return len(self._events)
 
     async def broadcast_hello(self, site_hello: SiteHello):
         self.sites[site_hello.siteId].name = site_hello.name
@@ -142,7 +148,7 @@ class Room:
         return len(self.sites) > 0
 
     def materialize(self) -> str:
-        return self.document.materialize()
+        return self._document.materialize()
 
 
 initial_message = "// To edit the document, first introduce yourself."
@@ -186,15 +192,14 @@ class RoomRepository:
         logger.info(f"Loaded {room_id} from disc. Text length: {len(text)}")
 
         room = Room.create_from_text(room_id, text)
-        logger.info(f"Initialized room {room_id} with {len(room.events)} events from disc")
-        self.events_at_last_flush[room_id] = len(room.events)
+        logger.info(f"Initialized room {room_id} with {room.events_len} events from disc")
+        self.events_at_last_flush[room_id] = room.events_len
 
         self.rooms[room_id] = room
         return room
 
     def flush(self, room: Room) -> None:
-        if ((room.room_id in self.events_at_last_flush)
-                and (len(room.events) == self.events_at_last_flush[room.room_id])):
+        if (room.room_id in self.events_at_last_flush) and (room.events_len == self.events_at_last_flush[room.room_id]):
             logger.debug(f"Skipping flush for {room.room_id}")
             return
 
@@ -203,7 +208,7 @@ class RoomRepository:
         with gzip.open(self.room_path(room.room_id), "wt") as f:
             f.write(text)
         logger.info(f"Persisted {room.room_id} to disc. Text length: {len(text)}. Took {time.time() - start_time:.2f}s")
-        self.events_at_last_flush[room.room_id] = len(room.events)
+        self.events_at_last_flush[room.room_id] = room.events_len
 
     def flush_everything(self) -> None:
         for room_id in list(self.rooms.keys()):
@@ -249,7 +254,7 @@ class RoomRepository:
         self.offload(room_id)
 
     @lru_cache
-    def total_rooms(self, unused: int) -> int:
+    def total_rooms(self, _: int) -> int:
         saved_rooms = set(p.name.replace(".txt.gz", "") for p in self.root.iterdir())
         saved_rooms |= set(self.rooms.keys())
         return len(saved_rooms)
@@ -262,5 +267,5 @@ def test_from_text():
     assert materialized_text == text
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     test_from_text()

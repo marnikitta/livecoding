@@ -58,5 +58,5 @@ def format_uptime(start: datetime.datetime, end: datetime.datetime) -> str:
     return uptime
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     print(generate_phonetic_name(14))

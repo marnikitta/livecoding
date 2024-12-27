@@ -8,14 +8,13 @@ from pathlib import Path
 from typing import Annotated
 
 import uvicorn
-from fastapi import FastAPI, WebSocket, HTTPException, Depends, APIRouter
+from fastapi import FastAPI, WebSocket, HTTPException, Depends
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
 from starlette.responses import FileResponse, PlainTextResponse
 from starlette.websockets import WebSocketDisconnect
 
 from livecoding.settings import settings
-from livecoding.model import WsMessage, SetSiteId, CrdtEventModel
+from livecoding.model import WsMessage, SetSiteId, RoomModel
 from livecoding.room import Room, Site, RoomRepository, FullLogException
 from livecoding.utils import try_notify_systemd, format_uptime
 
@@ -49,21 +48,10 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 
-class RoomSettings(BaseModel):
-    documentLimit: int = settings.document_size_limit
-    heartbitInterval: int = settings.heartbit_interval
-
-
-class RoomModel(BaseModel):
-    roomId: str
-    events: list[CrdtEventModel]
-    settings: RoomSettings = RoomSettings()
-
-
 @app.post("/resource/room")
 async def create_room() -> RoomModel:
     room: Room = room_repository.create()
-    return RoomModel(roomId=room.room_id, events=room.events)
+    return RoomModel(roomId=room.room_id, events=room.get_events())
 
 
 def room_provider(room_id: str) -> Room:
@@ -75,7 +63,7 @@ def room_provider(room_id: str) -> Room:
 
 @app.get("/resource/room/{room_id}")
 async def get_room(room: Annotated[Room, Depends(room_provider)]) -> RoomModel:
-    return RoomModel(roomId=room.room_id, events=room.events)
+    return RoomModel(roomId=room.room_id, events=room.get_events())
 
 
 async def send_heartbit(websocket: WebSocket, seconds: int = 5):
@@ -88,8 +76,7 @@ async def send_heartbit(websocket: WebSocket, seconds: int = 5):
 
 
 @app.websocket("/resource/room/{room_id}/ws")
-async def websocket_endpoint(room: Annotated[Room, Depends(room_provider)],
-                             websocket: WebSocket, offset: int = 0):
+async def websocket_endpoint(room: Annotated[Room, Depends(room_provider)], websocket: WebSocket, offset: int = 0):
     await websocket.accept()
     room_repository.claim(room.room_id)
 
@@ -111,7 +98,7 @@ async def websocket_endpoint(room: Annotated[Room, Depends(room_provider)],
 
             if msg.crdtEvents is not None:
                 await room.apply_events(msg.crdtEvents, sender=site_id)
-                if len(room.events) > settings.compaction_max_events_log:
+                if len(room._events) > settings.compaction_max_events_log:
                     await room_repository.compact(room.room_id)
             elif msg.siteHello is not None:
                 await room.broadcast_hello(msg.siteHello)
@@ -144,11 +131,11 @@ async def get_intro() -> str:
     uptime = format_uptime(started_at, datetime.datetime.now())
 
     return f"""// Welcome to livecoding.marnikitta.com
-//  
+//
 // 1. Create a new room
 // 2. Share the link with friends
 // 3. Start coding together!
-// 
+//
 // Happy coding!
 
 const stats = {{
@@ -174,15 +161,15 @@ const config = {{
 """
 
 
-@app.get('/')
+@app.get("/")
 async def index():
-    return FileResponse('frontend/index.html')
+    return FileResponse("frontend/index.html")
 
 
-@app.get('/room/{room_id}')
+@app.get("/room/{room_id}")
 async def room_index(room_id: str):
     print(room_id)
-    return FileResponse('frontend/index.html')
+    return FileResponse("frontend/index.html")
 
 
 app.mount("/public", app=StaticFiles(directory="./frontend/public"))

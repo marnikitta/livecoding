@@ -1,12 +1,30 @@
 import dataclasses
+import enum
 from typing import Optional
 
-from livecoding.model import GlobalIdModel, CrdtEventModel, EventType
+
+class EventType(str, enum.Enum):
+    insert = "insert"
+    delete = "delete"
+
+
+@dataclasses.dataclass(slots=True, frozen=True, order=True, eq=True)
+class GlobalIdInternal:
+    counter: int
+    siteId: int
+
+
+@dataclasses.dataclass(slots=True)
+class CrdtEventInternal:
+    type: EventType
+    gid: GlobalIdInternal
+    char: Optional[str] = None
+    afterGid: Optional[GlobalIdInternal] = None
 
 
 @dataclasses.dataclass(slots=True)
 class CharEntry:
-    gid: GlobalIdModel
+    gid: GlobalIdInternal
     char: str
     visible: bool = True
     next_entry: Optional["CharEntry"] = None
@@ -15,20 +33,20 @@ class CharEntry:
 class CrdtDocument:
     def __init__(self):
         self.head: Optional[CharEntry] = None
-        self.gid_to_entry: dict[tuple[int, int], CharEntry] = {}
+        self.gid_to_entry: dict[GlobalIdInternal, CharEntry] = {}
 
-    def apply(self, event: CrdtEventModel):
+    def apply(self, event: CrdtEventInternal):
         if event.type == EventType.delete:
-            self.gid_to_entry[event.gid.to_tuple()].visible = False
+            self.gid_to_entry[event.gid].visible = False
             return
 
         assert event.type == EventType.insert
-        if event.gid.to_tuple() in self.gid_to_entry:
+        if event.gid in self.gid_to_entry:
             return
 
         prev_entry = None
         if event.afterGid is not None:
-            prev_entry = self.gid_to_entry[event.afterGid.to_tuple()]
+            prev_entry = self.gid_to_entry[event.afterGid]
 
         next_entry = prev_entry.next_entry if prev_entry is not None else self.head
 
@@ -46,7 +64,7 @@ class CrdtDocument:
             prev_entry.next_entry = new_entry
             new_entry.next_entry = next_entry
 
-        self.gid_to_entry[event.gid.to_tuple()] = new_entry
+        self.gid_to_entry[event.gid] = new_entry
 
     def materialize(self) -> str:
         if self.head is None:
@@ -64,20 +82,30 @@ class CrdtDocument:
 
 def test_document():
     document = CrdtDocument()
-    document.apply(CrdtEventModel(type=EventType.insert, gid=GlobalIdModel(counter=0, siteId=1), char="a"))
+    document.apply(CrdtEventInternal(type=EventType.insert, gid=GlobalIdInternal(counter=0, siteId=1), char="a"))
     assert document.materialize() == "a"
 
-    document.apply(CrdtEventModel(type=EventType.insert, gid=GlobalIdModel(counter=1, siteId=1), char="b",
-                                  afterGid=GlobalIdModel(counter=0, siteId=1)))
+    document.apply(
+        CrdtEventInternal(
+            type=EventType.insert,
+            gid=GlobalIdInternal(counter=1, siteId=1),
+            char="b",
+            afterGid=GlobalIdInternal(counter=0, siteId=1),
+        )
+    )
     assert document.materialize() == "ab"
 
-    document.apply(CrdtEventModel(type=EventType.insert, gid=GlobalIdModel(counter=2, siteId=1), char="c",
-                                  afterGid=None))
+    document.apply(
+        CrdtEventInternal(type=EventType.insert, gid=GlobalIdInternal(counter=2, siteId=1), char="c", afterGid=None)
+    )
     assert document.materialize() == "cab"
 
-    document.apply(CrdtEventModel(type=EventType.delete, gid=GlobalIdModel(counter=0, siteId=1)))
+    document.apply(CrdtEventInternal(type=EventType.delete, gid=GlobalIdInternal(counter=0, siteId=1)))
     assert document.materialize() == "cb"
 
+    assert GlobalIdInternal(counter=1, siteId=1) < GlobalIdInternal(counter=1, siteId=2)
+    assert GlobalIdInternal(counter=2, siteId=1) > GlobalIdInternal(counter=1, siteId=2)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     test_document()
