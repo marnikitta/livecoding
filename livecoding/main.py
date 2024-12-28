@@ -122,7 +122,7 @@ async def get_intro() -> str:
 // 2. Share the link with friends
 // 3. Start coding together!
 
-// Real-time stats
+// Real-time stats:
 const stats = {{
     activeRooms: {active_rooms},
     activeUsers: {active_users},
@@ -134,7 +134,7 @@ const stats = {{
 // Kudos to Bartosz Sypytkowski for CRDT primer https://www.bartoszsypytkowski.com/operation-based-crdts-arrays-1
 // Inspired by https://code.yandex-team.ru
 
-// Server config
+// Server config:
 const config = {{
     heartbitInterval: {settings.heartbit_interval},
     documentSizeLimit: {settings.document_size_limit},

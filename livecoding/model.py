@@ -6,6 +6,7 @@ However, they can be used for serde and validation. After receiving, they are co
 
 import logging
 from typing import Optional
+import tracemalloc
 
 from pydantic import BaseModel, Field
 from typing_extensions import Annotated
@@ -86,14 +87,12 @@ class RoomModel(BaseModel):
 
 
 def test_memory_usage():
-    import tracemalloc
-
     tracemalloc.start()
 
     events = []
     for i in range(500_000):
-        events.append(CrdtEventModel(type=EventType.insert, gid=GlobalIdModel(counter=i, siteId=0), char="a"))
-        # events.append(CrdtEventInternal(type=EventType.insert, gid=GlobalIdInternal(counter=i, siteId=0), char="a"))
+        # events.append(CrdtEventModel(type=EventType.insert, gid=GlobalIdModel(counter=i, siteId=0), char="a"))
+        events.append(CrdtEventInternal(type=EventType.insert, gid=GlobalIdInternal(counter=i, siteId=0), char="a"))
 
     current, peak = tracemalloc.get_traced_memory()
     print(current >> 20, peak >> 20)

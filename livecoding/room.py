@@ -2,6 +2,7 @@ import asyncio
 import gzip
 import logging
 import time
+import tracemalloc
 from functools import lru_cache
 from pathlib import Path
 from typing import Optional
@@ -10,7 +11,7 @@ from fastapi.websockets import WebSocket
 from starlette.websockets import WebSocketState, WebSocketDisconnect
 
 from livecoding.document import CrdtDocument, CrdtEventInternal, GlobalIdInternal
-from livecoding.model import WsMessage, SiteDisconnected, CrdtEventModel, SiteHello, EventType
+from livecoding.model import WsMessage, SiteDisconnected, CrdtEventModel, SiteHello, EventType, GlobalIdModel
 from livecoding.settings import settings
 from livecoding.utils import generate_phonetic_name
 
@@ -56,8 +57,9 @@ class Site:
 
     @property
     def socket_connected(self) -> bool:
-        return (self._websocket.application_state == WebSocketState.CONNECTED) and \
-            (self._websocket.client_state == WebSocketState.CONNECTED)
+        return (self._websocket.application_state == WebSocketState.CONNECTED) and (
+            self._websocket.client_state == WebSocketState.CONNECTED
+        )
 
 
 class FullLogException(Exception):
@@ -65,12 +67,19 @@ class FullLogException(Exception):
 
 
 class Room:
-    def __init__(self, room_id: str, *, initial_events: Optional[list[CrdtEventInternal]] = None):
+    def __init__(
+        self,
+        room_id: str,
+        *,
+        initial_events: Optional[list[CrdtEventInternal]] = None,
+        events_limit: int = settings.hard_max_events_log,
+    ):
         self.room_id = room_id
         self.sites: dict[int, Site] = {}
 
         self._events: list[CrdtEventInternal] = []
         self._document = CrdtDocument()
+        self.events_limit = events_limit
 
         if initial_events is not None:
             for e in initial_events:
@@ -115,7 +124,7 @@ class Room:
         await self.broadcast(WsMessage(crdtEvents=crdt_events), sender)
 
     def _append_events(self, crdt_events: list[CrdtEventModel]):
-        if len(self._events) + len(crdt_events) > settings.hard_max_events_log:
+        if len(self._events) + len(crdt_events) > self.events_limit:
             raise FullLogException(
                 f"Reached hard limit. Current size: {len(self._events)}, new events: {len(crdt_events)}"
             )
@@ -301,5 +310,17 @@ def test_from_text():
     assert materialized_text == text
 
 
+def test_memory_usage():
+    tracemalloc.start()
+    room = Room("test", events_limit=1_000_000)
+
+    for i in range(250_000):
+        room._append_events([CrdtEventModel(type=EventType.insert, gid=GlobalIdModel(counter=i, siteId=0), char="a")])
+
+    current, peak = tracemalloc.get_traced_memory()
+    print(current >> 20, peak >> 20)
+
+
 if __name__ == "__main__":
-    test_from_text()
+    test_memory_usage()
+    # test_from_text()
