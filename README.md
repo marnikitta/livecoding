@@ -21,6 +21,7 @@ make build
 ```
 
 Watch frontend
+
 ```bash
 make watch-frontend
 ```
@@ -55,6 +56,7 @@ Frontend:
 - [ ] Add new document placeholder
 - [ ] call intro.js during create and handle update afterwords
 - [ ] Automatic reconnect
+- [ ] Add jslint
 
 Backend:
 
@@ -67,14 +69,19 @@ Backend:
 - [x] Benchmark file sizes
 - [ ] Remove rooms older than one week (include this message into greeting)
 - [ ] Prettify code for publishing
+    - Add kudos and all used links
 
 Server
+
 - [x] Remove server from 0.0.0.0
 - [x] Why websocket works?
 - [x] Add logs rotation
-  - It happens by itself
-- [ ] Test reboot
+    - It happens by itself
+- [x] Test reboot
 - [x] What is wrong with ssh settings. I moved it to 2222
-- [ ] Add ratelimiter. Stresstest it
 - [x] Add ufw firewall
+- [ ] Tune websocket ping pong timeout to match client heartbeats
+- [ ] How do restarts work? Is there a limit
+- [ ] Setup GitHub action for deployment
+- [ ] Add ratelimiter. Stresstest it
 - [ ] Overwrite 404

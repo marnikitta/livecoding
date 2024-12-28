@@ -51,8 +51,8 @@ export default {
 
       <div class="announcement"
            v-if="roomState === RoomState.waitingForName">
-        <form @submit.prevent="enterRoom(nameInput)">
-          <label class="name-label" for="name">To edit the document, introduce yourself</label>
+        <form class="name-form" @submit.prevent="enterRoom(nameInput)">
+          <label class="name-form__label" for="name">To edit the document, introduce yourself</label>
           <input type="text" id="name"
                  maxlength="30"
                  minlength="1"
@@ -61,7 +61,7 @@ export default {
                  required
                  :disabled="roomState === RoomState.connecting"
                  class="name-input"/>
-          <button class="name-form--button" :disabled="roomState=== RoomState.connecting">
+          <button :disabled="roomState=== RoomState.connecting">
             Join the room<span v-if="roomState === RoomState.connecting"> (connecting...)</span>
           </button>
         </form>

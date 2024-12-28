@@ -11,8 +11,8 @@ export default {
         </div>
       </header>
       <div class="announcement">
-        <form @submit.prevent="createRoom">
-          <label class="name-label" for="name">Create a room to start coding</label>
+        <form class="name-form" @submit.prevent="createRoom">
+          <label class="name-form__label" for="name">Create a room to start coding</label>
           <button id="create">Create room</button>
         </form>
       </div>
