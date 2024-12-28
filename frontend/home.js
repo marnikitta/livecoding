@@ -6,9 +6,7 @@ import {EditorView} from "@codemirror/view";
 export default {
     template: `
       <header class="header">
-        <div class="title">
-          <h1>Live coding editor</h1>
-        </div>
+        <h1>Live coding editor</h1>
       </header>
       <div class="announcement">
         <form class="name-form" @submit.prevent="createRoom">

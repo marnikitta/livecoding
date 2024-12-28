@@ -30,19 +30,19 @@ export default {
         <template v-else>
           Connection lost. Document is read-only.
         </template>
-        <a class="announcement__copy-link" @click="reload()">Refresh</a> the page to reconnect.
+        <a @click="reload()">Refresh</a> the page to reconnect.
       </div>
       <header class="header">
-        <div class="title">
-          <h1>Live coding editor</h1>
-        </div>
+        <h1>Live coding editor</h1>
 
-        <div class="online-sites" v-if="sites.size > 0">
-          <div class="online-sites__site" :style="{background: site.color}"
-               v-for="[s, site] in sites" :key="s">
-            {{ site.name }}<span v-if="siteId === s">&nbsp;(you)</span>
-          </div>
-        </div>
+        <ul class="online-sites" v-if="sites.size > 0">
+          <template v-for="index in 3" :key="index">
+            <li :style="{background: site.color}"
+                v-for="[s, site] in sites" :key="s">
+              {{ site.name }}<span v-if="siteId === s">&nbsp;(you)</span>
+            </li>
+          </template>
+        </ul>
       </header>
 
       <div class="announcement" v-if="roomState === RoomState.connecting">

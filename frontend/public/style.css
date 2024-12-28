@@ -13,12 +13,17 @@
     padding: 0;
     box-sizing: border-box;
     -webkit-text-size-adjust: none;
+    /*outline: 1px solid red;*/
 }
 
 button, input, select, textarea {
     font: inherit;
     background: transparent;
     border: 0;
+}
+
+ol, ul, menu {
+    list-style: none;
 }
 
 :root {
@@ -39,6 +44,7 @@ html {
 
 body {
     font-family: var(--font-family), sans-serif;
+    color: var(--color-grey-dark);
     display: flex;
     flex-direction: column;
     background-color: var(--color-white);
@@ -87,33 +93,30 @@ a:hover {
 }
 
 .header {
-    display: block;
-    padding-left: 1rem;
-    padding-right: 1rem;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-start;
+    row-gap: 0.7rem;
+
+    padding: 0.7rem 1rem;
     border-bottom: var(--color-grey-light) 1px solid;
 }
 
-@media (min-width: 64em) {
+@media (min-width: 48em) {
     .header {
         display: flex;
-
+        flex-direction: row;
         justify-content: space-between;
         align-items: center;
     }
 }
 
-.title {
-    display: flex;
-    column-gap: 1rem;
-    align-items: baseline;
-    margin-top: 0.7rem;
-    margin-bottom: 0.7rem;
-}
-
-.title h1 {
+.header h1 {
     font-size: 2rem;
     font-weight: 800;
     letter-spacing: 0.05rem;
+    line-height: 1;
 }
 
 .online-sites {
@@ -121,11 +124,16 @@ a:hover {
     column-gap: 0.5rem;
     row-gap: 0.5rem;
     flex-wrap: wrap;
-    margin-top: 0.7rem;
-    margin-bottom: 0.7rem;
+    flex-direction: row;
 }
 
-.online-sites__site {
+@media (min-width: 48em) {
+    .online-sites {
+        flex-direction: row-reverse;
+    }
+}
+
+.online-sites li {
     color: var(--color-white);
     /* the same as buttons */
     padding: 0.2rem 0.55rem;
@@ -141,10 +149,6 @@ a:hover {
 }
 
 .name-form__label {
-    margin-right: 0.5rem;
-}
-
-.name-form__input {
     margin-right: 0.5rem;
 }
 
