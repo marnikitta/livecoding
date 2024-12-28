@@ -1,3 +1,4 @@
+import asyncio
 import gzip
 import logging
 import time
@@ -6,10 +7,10 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi.websockets import WebSocket
-from starlette.websockets import WebSocketState
+from starlette.websockets import WebSocketState, WebSocketDisconnect
 
-from livecoding.document import CrdtDocument, CrdtEventInternal
-from livecoding.model import WsMessage, SiteDisconnected, CrdtEventModel, SiteHello, GlobalIdModel, EventType
+from livecoding.document import CrdtDocument, CrdtEventInternal, GlobalIdInternal
+from livecoding.model import WsMessage, SiteDisconnected, CrdtEventModel, SiteHello, EventType
 from livecoding.settings import settings
 from livecoding.utils import generate_phonetic_name
 
@@ -23,10 +24,18 @@ class Site:
         self._websocket = websocket
 
     async def send_message(self, message: WsMessage):
-        await self._websocket.send_text(message.model_dump_json(exclude_none=True))
+        try:
+            await self._websocket.send_text(message.model_dump_json(exclude_none=True))
+        except Exception:
+            raise WebSocketDisconnect()
 
-    def __del__(self):
-        self.close()
+    async def receive_message(self) -> WsMessage:
+        try:
+            text = await self._websocket.receive_text()
+        except Exception:
+            raise WebSocketDisconnect()
+
+        return WsMessage.model_validate_json(text)
 
     async def close(self):
         try:
@@ -34,9 +43,21 @@ class Site:
         except Exception:
             pass
 
+    async def heartbit_task(self, seconds: int):
+        while True:
+            try:
+                await self.send_message(WsMessage(heartbit=True))
+                await asyncio.sleep(seconds)
+            except WebSocketDisconnect:
+                break
+            except Exception:
+                logger.exception(f"Heartbit task for {self.site_id} failed")
+                break
+
     @property
-    def socket_disconnected(self) -> bool:
-        return self._websocket.client_state == WebSocketState.DISCONNECTED
+    def socket_connected(self) -> bool:
+        return (self._websocket.application_state == WebSocketState.CONNECTED) and \
+            (self._websocket.client_state == WebSocketState.CONNECTED)
 
 
 class FullLogException(Exception):
@@ -44,47 +65,44 @@ class FullLogException(Exception):
 
 
 class Room:
-    def __init__(self, room_id: str):
+    def __init__(self, room_id: str, *, initial_events: Optional[list[CrdtEventInternal]] = None):
         self.room_id = room_id
         self.sites: dict[int, Site] = {}
+
         self._events: list[CrdtEventInternal] = []
         self._document = CrdtDocument()
 
-    @staticmethod
-    def create_from_text(room_id: str, text: str):
-        room = Room(room_id)
-        prev_gid = None
-        for i, t in enumerate(text):
-            gid = GlobalIdModel(counter=i, siteId=RoomRepository.UTIL_SITE_ID)
-            room._append_events([CrdtEventModel(type=EventType.insert, gid=gid, afterGid=prev_gid, char=t)])
-            prev_gid = gid
-        materialized_text = room.materialize()
-        assert materialized_text == text
-        return room
+        if initial_events is not None:
+            for e in initial_events:
+                self._document.apply(e)
+            self._events += initial_events
 
-    @property
-    def max_site_id(self) -> int:
-        max_gid = max([e.gid.siteId for e in self._events], default=0)
-        return max(max(self.sites.keys(), default=0), max_gid) + 1
+    def get_next_site_id(self) -> int:
+        max_event_id = max([e.gid.siteId for e in self._events], default=0)
+        return max(max(self.sites.keys(), default=0), max_event_id) + 1
 
     async def connect(self, site: Site, offset: int = 0):
         if site.site_id in self.sites:
             raise ValueError(f"Site with id {site.site_id} already connected to room {self.room_id}")
 
         if len(self.sites) >= settings.max_sites:
-            raise FullLogException(f"Room {self.room_id} is full")
+            raise ValueError(f"Room {self.room_id} is full")
 
         self.sites[site.site_id] = site
-        logger.info(f"Site {site.site_id} connected to room {self.room_id}")
+        logger.info(f"Site {site.site_id} connected to the room {self.room_id}")
 
-        await site.send_message(WsMessage(crdtEvents=self.get_events(offset)))
+        await site.send_message(WsMessage(crdtEvents=self.get_model_events(offset)))
 
-        for s in self.sites.values():
-            if s.name is None:
+        for other_site_id in list(self.sites.keys()):
+            if other_site_id not in self.sites:
+                # other site might be already disconnected because await down below might have given control to other
+                # coroutine
                 continue
-            await site.send_message(WsMessage(siteHello=SiteHello(siteId=s.site_id, name=s.name)))
+            other_site = self.sites[other_site_id]
+            if other_site.name is not None:
+                await site.send_message(WsMessage(siteHello=SiteHello(siteId=other_site.site_id, name=other_site.name)))
 
-    def get_events(self, offset: int = 0) -> list[CrdtEventModel]:
+    def get_model_events(self, offset: int = 0) -> list[CrdtEventModel]:
         return [CrdtEventModel.from_internal(e) for e in self._events[offset:]]
 
     async def apply_events(self, crdt_events: list[CrdtEventModel], sender: Optional[int] = None):
@@ -112,19 +130,18 @@ class Room:
     def events_len(self) -> int:
         return len(self._events)
 
-    async def broadcast_hello(self, site_hello: SiteHello):
+    async def apply_hello(self, site_hello: SiteHello):
         self.sites[site_hello.siteId].name = site_hello.name
         await self.broadcast(WsMessage(siteHello=site_hello))
 
     async def broadcast(self, message: WsMessage, sender: Optional[int] = None):
-        sites = list(self.sites.values())
-        for site in sites:
+        for site in list(self.sites.values()):
             if site.site_id == sender:
                 continue
 
             try:
                 await site.send_message(message)
-            except Exception:
+            except WebSocketDisconnect:
                 logger.warning(f"Site {site.site_id} is not connected to room {self.room_id}")
                 await self.disconnect(site.site_id)
 
@@ -139,9 +156,9 @@ class Room:
 
         await self.broadcast(WsMessage(siteDisconnected=SiteDisconnected(siteId=site_id)))
 
-    async def clean_connections(self):
+    async def gc_sites(self):
         for site in list(self.sites.values()):
-            if site.socket_disconnected:
+            if not site.socket_connected:
                 await self.disconnect(site.site_id)
 
     def has_active_sites(self):
@@ -151,7 +168,20 @@ class Room:
         return self._document.materialize()
 
 
-initial_message = "// To edit the document, first introduce yourself."
+def create_from_text(room_id: str, text: str) -> Room:
+    prev_gid = None
+
+    events = []
+    for i, t in enumerate(text):
+        gid = GlobalIdInternal(counter=i, siteId=RoomRepository.UTIL_SITE_ID)
+        events.append(CrdtEventInternal(type=EventType.insert, gid=gid, afterGid=prev_gid, char=t))
+        prev_gid = gid
+
+    room = Room(room_id, initial_events=events)
+
+    materialized_text = room.materialize()
+    assert materialized_text == text
+    return room
 
 
 class RoomRepository:
@@ -165,7 +195,7 @@ class RoomRepository:
         self.events_at_last_flush: dict[str, int] = {}
 
     def create(self) -> Room:
-        # It might be removed if nobody connects to it
+        # Room might be GCed before it's claimed if no one connects to it
         room_id = generate_phonetic_name(length=14)
         room = Room(room_id)
         self.rooms[room_id] = room
@@ -185,13 +215,12 @@ class RoomRepository:
             return self.rooms[room_id]
 
         if not self.exists(room_id):
-            raise ValueError(f"Room {room_id} not found")
+            raise ValueError(f"Room {room_id} does not exist")
 
         with gzip.open(self.room_path(room_id), "rt") as f:
             text: str = f.read()
-        logger.info(f"Loaded {room_id} from disc. Text length: {len(text)}")
 
-        room = Room.create_from_text(room_id, text)
+        room = create_from_text(room_id, text)
         logger.info(f"Initialized room {room_id} with {room.events_len} events from disc")
         self.events_at_last_flush[room_id] = room.events_len
 
@@ -210,42 +239,47 @@ class RoomRepository:
         logger.info(f"Persisted {room.room_id} to disc. Text length: {len(text)}. Took {time.time() - start_time:.2f}s")
         self.events_at_last_flush[room.room_id] = room.events_len
 
-    def flush_everything(self) -> None:
-        for room_id in list(self.rooms.keys()):
+    def flush_rooms(self) -> None:
+        for room_id, room in self.rooms.items():
             try:
-                self.flush(self.rooms[room_id])
+                self.flush(room)
             except Exception:
                 logger.exception(f"Failed to flush room {room_id}. Ignoring it")
 
     async def gc(self) -> None:
         for room in list(self.rooms.values()):
             try:
-                await room.clean_connections()
+                await room.gc_sites()
                 if not room.has_active_sites():
                     logger.info(f"Room {room.room_id} is empty, removing it from memory")
                     self.offload(room.room_id)
             except Exception:
                 logger.exception(f"Failed to cleanup room {room.room_id}. Removing it from memory")
-                del self.rooms[room.room_id]
+                self.offload(room.room_id)
 
     def offload(self, room_id: str):
         if room_id not in self.rooms:
             return
-
         room = self.rooms[room_id]
-        self.flush(room)
+
+        try:
+            self.flush(room)
+        except Exception:
+            logger.exception(f"Failed to flush room {room_id}. Continuing with offload")
+
         del self.rooms[room_id]
         if room_id in self.events_at_last_flush:
             del self.events_at_last_flush[room_id]
+        logger.info(f"Removed room {room_id} from memory")
 
     def room_path(self, room_id: str) -> Path:
         return self.root / f"{room_id}.txt.gz"
 
-    async def compact(self, room_id: str):
+    async def compact_room(self, room_id: str):
         if room_id not in self.rooms:
             return
 
-        logger.info(f"Compacting room {room_id}")
+        logger.warning(f"Compacting room {room_id}")
         room = self.rooms[room_id]
         await room.broadcast(WsMessage(compactionRequired=True))
         for site in list(room.sites.values()):
@@ -262,7 +296,7 @@ class RoomRepository:
 
 def test_from_text():
     text = "Hello, World!"
-    room = Room.create_from_text(generate_phonetic_name(), text)
+    room = create_from_text(generate_phonetic_name(), text)
     materialized_text = room.materialize()
     assert materialized_text == text
 

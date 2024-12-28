@@ -92,6 +92,10 @@ a:hover {
     color: var(--color-grey-dark);
 }
 
+.announcement a {
+    font-weight: bold;
+}
+
 .header {
     display: flex;
     flex-direction: column;

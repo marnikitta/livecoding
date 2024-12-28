@@ -11,6 +11,7 @@ import uvicorn
 from fastapi import FastAPI, WebSocket, HTTPException, Depends
 from fastapi.staticfiles import StaticFiles
 from starlette.responses import FileResponse, PlainTextResponse
+
 from starlette.websockets import WebSocketDisconnect
 
 from livecoding.settings import settings
@@ -42,7 +43,7 @@ async def lifespan(app: FastAPI):
     try_notify_systemd()
     yield
     logger.info("Terminating application. Flushing all rooms")
-    room_repository.flush_everything()
+    room_repository.flush_rooms()
 
 
 app = FastAPI(lifespan=lifespan)
@@ -51,7 +52,7 @@ app = FastAPI(lifespan=lifespan)
 @app.post("/resource/room")
 async def create_room() -> RoomModel:
     room: Room = room_repository.create()
-    return RoomModel(roomId=room.room_id, events=room.get_events())
+    return RoomModel(roomId=room.room_id, events=room.get_model_events())
 
 
 def room_provider(room_id: str) -> Room:
@@ -63,16 +64,7 @@ def room_provider(room_id: str) -> Room:
 
 @app.get("/resource/room/{room_id}")
 async def get_room(room: Annotated[Room, Depends(room_provider)]) -> RoomModel:
-    return RoomModel(roomId=room.room_id, events=room.get_events())
-
-
-async def send_heartbit(websocket: WebSocket, seconds: int = 5):
-    while True:
-        try:
-            await asyncio.sleep(seconds)
-            await websocket.send_text(WsMessage(heartbit=True).model_dump_json(exclude_none=True))
-        except WebSocketDisconnect:
-            break
+    return RoomModel(roomId=room.room_id, events=room.get_model_events())
 
 
 @app.websocket("/resource/room/{room_id}/ws")
@@ -80,44 +72,38 @@ async def websocket_endpoint(room: Annotated[Room, Depends(room_provider)], webs
     await websocket.accept()
     room_repository.claim(room.room_id)
 
-    heartbit_task = asyncio.create_task(send_heartbit(websocket, seconds=settings.heartbit_interval))
-
-    site_id = room.max_site_id + 1
+    site_id = room.get_next_site_id()
+    site = Site(site_id, websocket)
 
     try:
-        await room.connect(Site(site_id, websocket), offset)
+        await room.connect(site, offset)
+        assert await websocket.receive_text() == "Hello", "First message must be Hello"
 
-        hello: str = await websocket.receive_text()
-        assert hello == "Hello"
-
-        await websocket.send_text(WsMessage(setSiteId=SetSiteId(siteId=site_id)).model_dump_json(exclude_none=True))
+        await site.send_message(WsMessage(setSiteId=SetSiteId(siteId=site_id)))
+        _ = asyncio.create_task(site.heartbit_task(settings.heartbit_interval))
 
         while True:
-            raw_msg = await websocket.receive_text()
-            msg = WsMessage.model_validate_json(raw_msg)
+            msg = await site.receive_message()
 
             if msg.crdtEvents is not None:
                 await room.apply_events(msg.crdtEvents, sender=site_id)
-                if len(room._events) > settings.compaction_max_events_log:
-                    await room_repository.compact(room.room_id)
+                if room.events_len > settings.compaction_max_events_log:
+                    await room_repository.compact_room(room.room_id)
             elif msg.siteHello is not None:
-                await room.broadcast_hello(msg.siteHello)
+                await room.apply_hello(msg.siteHello)
             else:
                 raise ValueError(f"Invalid message: {msg}")
-    except WebSocketDisconnect:
-        await room.disconnect(site_id)
     except FullLogException:
         logger.error(f"Room {room.room_id} is full")
-    except Exception as e:
-        logger.exception(e)
+    except WebSocketDisconnect:
+        pass
     finally:
-        heartbit_task.cancel()
         await room.disconnect(site_id)
 
 
 async def cleanup_task():
     while True:
-        room_repository.flush_everything()
+        room_repository.flush_rooms()
         await room_repository.gc()
         await asyncio.sleep(10)
 
@@ -182,5 +168,7 @@ if __name__ == "__main__":
         log_config=None,
         port=5000,
         workers=1,
+        ws_ping_timeout=settings.heartbit_interval,
+        ws_ping_interval=settings.heartbit_interval,
         # reload=True
     )

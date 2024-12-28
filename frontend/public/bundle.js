@@ -57,12 +57,12 @@ Server rendered element contains fewer child nodes than client vdom.`),x=!0),pr(
         <h1>Live coding editor</h1>
 
         <ul class="online-sites" v-if="sites.size > 0">
-          <template v-for="index in 3" :key="index">
-            <li :style="{background: site.color}"
-                v-for="[s, site] in sites" :key="s">
-              {{ site.name }}<span v-if="siteId === s">&nbsp;(you)</span>
-            </li>
-          </template>
+          <!--          <template v-for="index in 3" :key="index">-->
+          <li :style="{background: site.color}"
+              v-for="[s, site] in sites" :key="s">
+            {{ site.name }}<span v-if="siteId === s">&nbsp;(you)</span>
+          </li>
+          <!--          </template>-->
         </ul>
       </header>
 
