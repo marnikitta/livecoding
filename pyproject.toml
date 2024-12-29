@@ -9,6 +9,8 @@ readme = "README.md"
 python = "^3.12"
 fastapi = {extras = ["standard"], version = "^0.115.6"}
 websockets = "^14.1"
+requests = "^2.32.3"
+types-requests = "^2.32.0.20241016"
 
 
 [tool.poetry.group.dev.dependencies]

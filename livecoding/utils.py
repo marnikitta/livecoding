@@ -4,6 +4,10 @@ import random
 
 import logging
 import socket
+from functools import lru_cache
+from typing import Optional
+
+import requests
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +63,22 @@ def format_uptime(start: datetime.datetime, end: datetime.datetime) -> str:
 
     uptime = f"{days} days, {hours:02}:{minutes:02}"
     return uptime
+
+
+@lru_cache
+def get_stars(repository: str, cache_ts: int) -> Optional[int]:
+    """
+    :param repository:
+    :param cache_ts: is a hacky way to cache responses.
+    """
+    try:
+        res = requests.get(f"https://api.github.com/repos/{repository}")
+        res.raise_for_status()
+        data = res.json()
+        return data["stargazers_count"]
+    except Exception as e:
+        logger.exception("Failed to fetch stars", e)
+        return None
 
 
 if __name__ == "__main__":

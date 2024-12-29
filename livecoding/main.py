@@ -17,7 +17,7 @@ from starlette.websockets import WebSocketDisconnect
 from livecoding.settings import settings
 from livecoding.model import WsMessage, SetSiteId, RoomModel
 from livecoding.room import Room, Site, RoomRepository, FullLogException
-from livecoding.utils import try_notify_systemd, format_uptime
+from livecoding.utils import try_notify_systemd, format_uptime, get_stars
 
 
 def configure_logging():
@@ -113,8 +113,12 @@ async def get_intro() -> str:
     active_rooms = len(room_repository.rooms)
     active_users = sum(len(room.sites) for room in room_repository.rooms.values())
     # smart way to cache for 5 seconds
-    total_rooms = room_repository.total_rooms(round(time.time() / 5))
+    total_rooms = room_repository.total_rooms(round(time.time() / 30))
     uptime = format_uptime(started_at, datetime.datetime.now())
+    if settings.repository:
+        stars = get_stars("marnikitta/livecoding", round(time.time() / 60))
+    else:
+        stars = None
 
     return f"""// Welcome to livecoding.marnikitta.com
 //
@@ -122,7 +126,8 @@ async def get_intro() -> str:
 // 2. Share the link with friends
 // 3. Start coding together!
 
-// Sources are available at https://github.com/marnikitta/livecoding
+// Sources are available at 
+// https://github.com/marnikitta/livecoding
 
 // Real-time stats:
 const stats = {{
@@ -130,6 +135,7 @@ const stats = {{
     activeUsers: {active_users},
     totalRooms: {total_rooms},
     uptime: "{uptime}",
+    githubStars: {stars or "undefined"},
 }};
 
 // Server config:
@@ -140,8 +146,9 @@ const config = {{
     eventsHardLimit: {settings.events_hard_limit},
 }};
 
-// Pro tip: To change code highlighting, change file extension in the URL,
-//  e.g. /room/emutilusejaxok.css for CSS
+// Pro tip: To change code highlighting, 
+//   change file extension in the URL,
+//   e.g. /room/emutilusejaxok.css for CSS
 """
 
 
