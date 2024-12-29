@@ -39,12 +39,12 @@ ol, ul, menu {
 
 html {
     height: 100%;
-    font-size: 100%;
 }
 
 body {
     height: 100%;
     font-family: var(--font-family), sans-serif;
+    font-size: 1rem;
     color: var(--color-grey-dark);
     background-color: var(--color-white);
 }
@@ -167,7 +167,11 @@ a:hover {
 
 .cm-editor {
     height: 100%;
+}
+
+.cm-editor .cm-content {
     font-family: var(--font-family-mono), monospace;
+    font-size: 1rem;
 }
 
 .cm-editor .cm-lineNumbers {
