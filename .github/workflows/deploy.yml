@@ -3,7 +3,6 @@ on:
   push:
     branches:
       - main
-      - workflow
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -33,7 +32,6 @@ jobs:
             HostName $SSH_HOST
             User $SSH_USER
             IdentityFile ~/.ssh/deployment.key
-            StrictHostKeyChecking no
             Port 2222
           END
         env:
@@ -41,8 +39,6 @@ jobs:
           SSH_KEY: ${{ secrets.deployment_ssh_key }}
           SSH_HOST: ${{ secrets.deployment_ssh_host }}
           KNOWN_HOSTS: ${{ secrets.deployment_known_hosts }}
-#      - name: Deploy
-#        run: ssh -T production  "systemctl --user restart livecoding.service"
       - name: Deploy
         run: make deploy
 
