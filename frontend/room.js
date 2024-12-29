@@ -96,13 +96,12 @@ export default {
         console.log("Room mounted", {roomId: this.roomId, extension: this.extension})
 
         this.readonlyCompartment = new Compartment()
-        this.editableCompartment = new Compartment()
 
         let state = EditorState.create({
             doc: this.document.getText(),
             extensions: [
-                this.editableCompartment.of(EditorView.editable.of(false)),
-                this.readonlyCompartment.of(EditorState.readOnly.of(true)),
+                this.readonlyCompartment.of([EditorView.editable.of(false),
+                    EditorState.readOnly.of(true)]),
                 ...defaultExtensions,
                 getLanguageByExtension(this.extension),
                 EditorView.updateListener.of(update => {
@@ -118,6 +117,7 @@ export default {
                 }),
             ]
         });
+
         this.view = new EditorView({
             state: state,
             parent: document.getElementById("editor-view"),
@@ -242,9 +242,8 @@ export default {
         setReadonly(readonly) {
             this.view.dispatch({
                 effects:
-                    [this.editableCompartment.reconfigure(EditorView.editable.of(!readonly)),
-                        this.readonlyCompartment.reconfigure(EditorState.readOnly.of(readonly))
-                    ]
+                    [this.readonlyCompartment.reconfigure([EditorView.editable.of(!readonly),
+                        EditorState.readOnly.of(readonly)])]
             })
         },
         /**

@@ -24,6 +24,7 @@ export default {
                 ...defaultExtensions,
                 javascriptLanguage,
                 EditorView.editable.of(false),
+                EditorState.readOnly.of(true),
             ]
         });
         this.view = new EditorView({
