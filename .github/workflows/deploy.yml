@@ -3,7 +3,6 @@ on:
   push:
     branches:
       - main
-      - workflow
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -33,7 +32,6 @@ jobs:
             User $SSH_USER
             IdentityFile ~/.ssh/deployment.key
             Port 2222
-            StrictHostKeyChecking no
           END
         env:
           SSH_USER: ${{ secrets.deployment_ssh_user }}
