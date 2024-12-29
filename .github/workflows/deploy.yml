@@ -41,3 +41,4 @@ jobs:
           SSH_HOST: ${{ secrets.deployment_ssh_host }}
       - name: Deploy
         run: ssh -T production  "systemctl --user restart livecoding.service"
+
