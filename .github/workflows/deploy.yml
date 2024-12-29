@@ -26,18 +26,21 @@ jobs:
         run: |
           mkdir -p ~/.ssh/
           echo "$SSH_KEY" > ~/.ssh/deployment.key
-          chmod 600 ~/.ssh/deployment.key
+          echo "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/deployment.key ~/.ssh/known_hosts
           cat >>~/.ssh/config <<END
           Host livecoding
             HostName $SSH_HOST
             User $SSH_USER
             IdentityFile ~/.ssh/deployment.key
+            StrictHostKeyChecking no
             Port 2222
           END
         env:
           SSH_USER: ${{ secrets.deployment_ssh_user }}
           SSH_KEY: ${{ secrets.deployment_ssh_key }}
           SSH_HOST: ${{ secrets.deployment_ssh_host }}
+          KNOWN_HOSTS: ${{ secrets.deployment_known_hosts }}
 #      - name: Deploy
 #        run: ssh -T production  "systemctl --user restart livecoding.service"
       - name: Deploy
