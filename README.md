@@ -20,14 +20,12 @@ The project was inspired by [code.yandex-team.ru](https://code.yandex-team.ru).
 - [FiraCode](https://github.com/tonsky/FiraCode)
 
 I tried to minimize build steps and dependencies, so I used Vue.js without `*.vue` files. Check out Julia Evans’ article
-on  
-[Writing JavaScript without a build system](https://jvns.ca/blog/2023/02/16/writing-javascript-without-a-build-system/).
+on [Writing JavaScript without a build system](https://jvns.ca/blog/2023/02/16/writing-javascript-without-a-build-system/).
 
 For CSS and HTML layout and design, I drew inspiration from [37signals.com](https://37signals.com). Their site was built
 without build systems, and the source code is clean and readable.
 
-Collaborative editing is implemented from scratch using a CRDT Replicated Growable Array algorithm. Check
-out [Bartosz Sypytkowski's primer on CRDTs](https://www.bartoszsypytkowski.com/operation-based-crdts-arrays-1).
+Collaborative editing is implemented from scratch using a CRDT Replicated Growable Array algorithm. See [Bartosz Sypytkowski's primer on CRDTs](https://www.bartoszsypytkowski.com/operation-based-crdts-arrays-1).
 
 The backend is written in Python with FastAPI. It serves static files and handles WebSocket connections.
 
@@ -65,11 +63,11 @@ This command will start a watcher that updates `frontend/public/bundle.js` on-th
 ## Deployment
 
 [livecoding.marnikitta.com](https://livecoding.marnikitta.com) is deployed on a VPS.
-The backend service is managed by systemd. Check
-out [Writing a systemd Service in Python](https://github.com/torfsen/python-systemd-tutorial]).
+The backend service is managed by systemd. I followed
+[Writing a systemd Service in Python](https://github.com/torfsen/python-systemd-tutorial]) article.
 The frontend is served via nginx. It also serves as a reverse proxy for the backend. HTTPS is provided by Let's Encrypt.
 
-This setup is inspired by article [How I run my servers](https://blog.wesleyac.com/posts/how-i-run-my-servers). Check it
+This setup is inspired by article [How I run my servers](https://blog.wesleyac.com/posts/how-i-run-my-servers).
 out.
 
 nginx configuration and unit file are not included in this repository.
