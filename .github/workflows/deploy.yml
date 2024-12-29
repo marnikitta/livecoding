@@ -21,24 +21,24 @@ jobs:
           node-version: latest
       - name: Build the project
         run: make build
+      - name: Lint the project
+        run: make lint
       - name: Configure SSH
         run: |
           mkdir -p ~/.ssh/
           echo "$SSH_KEY" > ~/.ssh/deployment.key
-          echo "$KNOWN_HOSTS" > ~/.ssh/known_hosts
-          chmod 600 ~/.ssh/deployment.key ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/deployment.key
           cat >>~/.ssh/config <<END
           Host livecoding
             HostName $SSH_HOST
             User $SSH_USER
             IdentityFile ~/.ssh/deployment.key
+            StrictHostKeyChecking no
             Port 2222
           END
         env:
           SSH_USER: ${{ secrets.deployment_ssh_user }}
           SSH_KEY: ${{ secrets.deployment_ssh_key }}
           SSH_HOST: ${{ secrets.deployment_ssh_host }}
-          KNOWN_HOSTS: ${{ secrets.deployment_known_hosts }}
       - name: Deploy
         run: make deploy
-
