@@ -1,7 +1,11 @@
-name: Deploy service
-on: [ push ]
+name: Deploy livecoding.marnikitta.com service
+on:
+  push :
+    branches:
+      - main
+      - workflow
 jobs:
-  Explore-GitHub-Actions:
+  deploy:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository code
@@ -12,7 +16,9 @@ jobs:
           python-version: 3.12.0
       - name: Install poetry
         run: python -m pip install poetry
-      - name: Install dependencies
-        run: make .venv
-      - name: Lint the project
-        run: make lint
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: latest
+      - name: Build the project
+        run: make build
