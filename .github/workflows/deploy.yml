@@ -1,6 +1,6 @@
 name: Deploy livecoding.marnikitta.com service
 on:
-  push :
+  push:
     branches:
       - main
       - workflow
@@ -22,3 +22,22 @@ jobs:
           node-version: latest
       - name: Build the project
         run: make build
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh/
+          echo "$SSH_KEY" > ~/.ssh/deployment.key
+          chmod 600 ~/.ssh/deployment.key
+          cat >>~/.ssh/config <<END
+          Host production
+            HostName $SSH_HOST
+            User $SSH_USER
+            IdentityFile ~/.ssh/deployment.key
+            Port 2222
+            StrictHostKeyChecking no
+          END
+        env:
+          SSH_USER: ${{ secrets.deployment_ssh_user }}
+          SSH_KEY: ${{ secrets.deployment_ssh_key }}
+          SSH_HOST: ${{ secrets.deployment_ssh_host }}
+      - name: Deploy
+        run: ssh -T production  "systemctl --user restart livecoding.service"

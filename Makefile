@@ -44,11 +44,12 @@ push: build lint
 
 deploy: push
 	ssh -T $(host) "systemctl --user restart livecoding.service"
-	ssh -T $(host) "journalctl --user-unit=livecoding.service --no-pager | tail -n 20"
 
 stop-deploy:
 	ssh -T $(host) "systemctl --user stop livecoding.service"
-	ssh -T $(host) "journalctl --user-unit=livecoding.service --no-pager | tail -n 20"
+
+view-log:
+	ssh -T $(host) "journalctl --user-unit=livecoding.service --no-pager | tail -n 30"
 
 FORCE:
 
