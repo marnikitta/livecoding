@@ -21,9 +21,9 @@ Frontend:
 - [x] Mobile responsive design
 - [x] Revising 37signals paddings and margins. Probably need to change everything to ems instead of rems
 - [x] Focus in name field. Focus in code after room creation
+- [x] Stretch code editor
 - [ ] Add favicon and the rest of the staff
 - [ ] Pretty "room not found" error
-- [ ] Stretch code editor
 - [ ] Presence tooltips
 - [ ] Add new document placeholder
 - [ ] call intro.js during create and handle update afterwords
@@ -52,6 +52,7 @@ Server
 - [x] Test reboot
 - [x] What is wrong with ssh settings. I moved it to 2222
 - [x] Add ufw firewall
+- [ ] Set up restart cron
 - [ ] Tune websocket ping pong timeout to match client heartbeats
 - [ ] How do restarts work? Is there a limit
 - [ ] Setup GitHub action for deployment

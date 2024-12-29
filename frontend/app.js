@@ -11,9 +11,7 @@ import {createRouter, createWebHistory, RouterView} from "vue-router";
 
 const app = createApp({
     template: `
-      <main>
-        <RouterView/>
-      </main>
+      <RouterView/>
     `,
     components: {
         Room,

@@ -38,16 +38,21 @@ ol, ul, menu {
 }
 
 html {
+    height: 100%;
     font-size: 100%;
 }
 
-
 body {
+    height: 100%;
     font-family: var(--font-family), sans-serif;
     color: var(--color-grey-dark);
+    background-color: var(--color-white);
+}
+
+#app {
+    height: 100%;
     display: flex;
     flex-direction: column;
-    background-color: var(--color-white);
 }
 
 /* form controls */
@@ -156,7 +161,12 @@ a:hover {
     margin-right: 0.5rem;
 }
 
-.cm-editor .cm-content {
+#editor-view {
+    flex: 1;
+}
+
+.cm-editor {
+    height: 100%;
     font-family: var(--font-family-mono), monospace;
 }
 
