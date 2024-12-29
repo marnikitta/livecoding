@@ -27,7 +27,7 @@ jobs:
           echo "$SSH_KEY" > ~/.ssh/deployment.key
           chmod 600 ~/.ssh/deployment.key
           cat >>~/.ssh/config <<END
-          Host production
+          Host livecoding
             HostName $SSH_HOST
             User $SSH_USER
             IdentityFile ~/.ssh/deployment.key
@@ -37,6 +37,8 @@ jobs:
           SSH_USER: ${{ secrets.deployment_ssh_user }}
           SSH_KEY: ${{ secrets.deployment_ssh_key }}
           SSH_HOST: ${{ secrets.deployment_ssh_host }}
+#      - name: Deploy
+#        run: ssh -T production  "systemctl --user restart livecoding.service"
       - name: Deploy
-        run: ssh -T production  "systemctl --user restart livecoding.service"
+        run: make deploy
 
