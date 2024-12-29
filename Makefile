@@ -15,6 +15,8 @@ build: .venv $(bundle_path)
 lint: .venv
 	poetry run mypy --check-untyped-defs --ignore-missing-imports livecoding
 	poetry run black --line-length 120 livecoding
+
+format: .venv
 	poetry run flake8 --ignore E501,W503,E203 livecoding
 
 .venv: poetry.lock
@@ -42,11 +44,12 @@ push: build lint
 
 deploy: push
 	ssh -T $(host) "systemctl --user restart livecoding.service"
-	ssh -T $(host) "journalctl --user-unit=livecoding.service --no-pager | tail -n 20"
 
 stop-deploy:
 	ssh -T $(host) "systemctl --user stop livecoding.service"
-	ssh -T $(host) "journalctl --user-unit=livecoding.service --no-pager | tail -n 20"
+
+view-log:
+	ssh -T $(host) "journalctl --user-unit=livecoding.service --no-pager | tail -n 30"
 
 FORCE:
 
