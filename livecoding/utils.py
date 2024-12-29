@@ -5,11 +5,17 @@ import random
 import logging
 import socket
 
-vowels = "aeiou"
-consonants = "bcdfghjklmnpqrstvwxyz"
+logger = logging.getLogger(__name__)
 
 
 def generate_phonetic_name(length: int = 14) -> str:
+    """
+    Ported from hastebin name generator
+    https://github.com/toptal/haste-server/blob/master/lib/key_generators/phonetic.js
+    """
+    vowels = "aeiou"
+    consonants = "bcdfghjklmnpqrstvwxyz"
+
     text = ""
     start = random.random() < 0.5
 
@@ -20,9 +26,6 @@ def generate_phonetic_name(length: int = 14) -> str:
             text += random.choice(vowels)
 
     return text
-
-
-logger = logging.getLogger(__name__)
 
 
 def try_notify_systemd() -> None:

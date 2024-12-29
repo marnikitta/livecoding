@@ -169,6 +169,11 @@ a:hover {
     height: 100%;
 }
 
+#editor-view .cm-editor.cm-focused {
+    /* selector is so specific in order to overwrite codemirror defaults */
+    outline: none;
+}
+
 .cm-editor .cm-content {
     font-family: var(--font-family-mono), monospace;
     font-size: 1rem;

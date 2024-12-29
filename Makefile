@@ -7,16 +7,15 @@ deploy_files := livecoding frontend poetry.toml README.md poetry.lock pyproject.
 
 all: build
 
-build: .venv $(bundle_path)
-
-run: .venv $(bundle_path)
+run: build
 	poetry run python -m livecoding.main
+
+build: .venv $(bundle_path)
 
 lint: .venv
 	poetry run mypy --check-untyped-defs --ignore-missing-imports livecoding
 	poetry run black --line-length 120 livecoding
 	poetry run flake8 --ignore E501,W503,E203 livecoding
-
 
 .venv: poetry.lock
 	poetry install

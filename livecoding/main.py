@@ -87,7 +87,7 @@ async def websocket_endpoint(room: Annotated[Room, Depends(room_provider)], webs
 
             if msg.crdtEvents is not None:
                 await room.apply_events(msg.crdtEvents, sender=site_id)
-                if room.events_len > settings.compaction_max_events_log:
+                if room.events_len > settings.events_compaction_limit:
                     await room_repository.compact_room(room.room_id)
             elif msg.siteHello is not None:
                 await room.apply_hello(msg.siteHello)
@@ -122,6 +122,8 @@ async def get_intro() -> str:
 // 2. Share the link with friends
 // 3. Start coding together!
 
+// Sources are available at https://github.com/marnikitta/livecoding
+
 // Real-time stats:
 const stats = {{
     activeRooms: {active_rooms},
@@ -130,20 +132,16 @@ const stats = {{
     uptime: "{uptime}",
 }};
 
-// Sources are available at https://github.com/marnikitta/livecoding
-// Kudos to Bartosz Sypytkowski for CRDT primer https://www.bartoszsypytkowski.com/operation-based-crdts-arrays-1
-// Inspired by https://code.yandex-team.ru
-
 // Server config:
 const config = {{
     heartbitInterval: {settings.heartbit_interval},
     documentSizeLimit: {settings.document_size_limit},
-    compactionMaxEventsLog: {settings.compaction_max_events_log},
-    hardMaxEventsLog: {settings.hard_max_events_log},
+    eventsCompactionLimit: {settings.events_compaction_limit},
+    eventsHardLimit: {settings.events_hard_limit},
 }};
 
-// P.S. To change code highlighting, change file extension in the URL,
-//  e.g. /room/emutilusejaxok.py for Python
+// Pro tip: To change code highlighting, change file extension in the URL,
+//  e.g. /room/emutilusejaxok.css for CSS
 """
 
 
@@ -172,3 +170,19 @@ if __name__ == "__main__":
         ws_ping_interval=settings.heartbit_interval,
         # reload=True
     )
+
+
+def fizzbuzz(n: int):
+    for x in range(n):
+        if x % 3 == 0 and x % 5 == 0:
+            print("fizz buzz")
+        elif x % 3 == 0:
+            print("fizz")
+        elif x % 5 == 0:
+            print("buzz")
+        else:
+            print(x)
+
+
+def main():
+    print(fizzbuzz(20))

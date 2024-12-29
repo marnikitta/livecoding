@@ -72,7 +72,7 @@ class Room:
         room_id: str,
         *,
         initial_events: Optional[list[CrdtEventInternal]] = None,
-        events_limit: int = settings.hard_max_events_log,
+        events_limit: int = settings.events_hard_limit,
     ):
         self.room_id = room_id
         self.sites: dict[int, Site] = {}
