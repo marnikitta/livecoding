@@ -1,4 +1,6 @@
 node_modules
 .idea
 data
+frontend/public/bundle.js
+frontend/public/bundle.js.map
 __pycache__
