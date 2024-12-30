@@ -28,7 +28,6 @@
 - [x] Pretty "room not found" error
 - [x] Fix messed up input border
 - [ ] Presence tooltips
-- [ ] Call intro.js during create and handle update afterward
 - [ ] Automatic reconnect
 - [ ] Add jslint
 
@@ -61,7 +60,6 @@
 - [x] Add UFW firewall
 - [x] Set up GitHub action for deployment
 - [ ] Add known_hosts to the deployment script
-- [ ] Set up restart cron
 - [ ] How do restarts work? Is there a limit?
 - [ ] Add rate limiter. Stress test it
 - [ ] Overwrite 404 nginx error with something fun

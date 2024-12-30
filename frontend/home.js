@@ -70,7 +70,7 @@ export default {
                 case "roomNotFound":
                     return "Room not found. It might have been deleted after a period of inactivity.";
                 default:
-                    return "An error occurred. Error code: `" + this.errorCode + "`)";
+                    return "An error occurred. Error code: `" + this.errorCode + "`";
             }
         }
     },

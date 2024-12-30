@@ -149,7 +149,6 @@ const liveStats = {{
     githubStars: {stars or "undefined"},
 }};
 
-// Server config:
 const serverConfig = {{
     heartbitInterval: {settings.heartbit_interval},
     documentSizeLimit: {settings.document_size_limit},
