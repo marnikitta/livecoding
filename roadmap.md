@@ -24,11 +24,11 @@
 - [x] Stretch code editor
 - [x] Record a GIF with an editor
 - [x] Add visibility presence highlighting
-- [ ] Pretty "room not found" error
-- [ ] Add favicon and the rest of the stuff
-- [ ] Fix messed up input border
+- [x] Add favicon and the rest of the stuff
+- [x] Pretty "room not found" error
+- [x] Fix messed up input border
 - [ ] Presence tooltips
-- [ ] Call intro.js during create and handle update afterwards
+- [ ] Call intro.js during create and handle update afterward
 - [ ] Automatic reconnect
 - [ ] Add jslint
 

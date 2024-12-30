@@ -1,6 +1,6 @@
 import Room from "./room.js"
 import Home from "./home.js"
-import {runAllTests} from "./lib/test_document.js";
+// import {runAllTests} from "./lib/test_document.js";
 
 // Such a weird import is required for pure js templates
 // See https://jvns.ca/blog/2021/11/15/esbuild-vue/ for details
@@ -18,13 +18,16 @@ const app = createApp({
         RouterView
     },
     mounted() {
-        runAllTests()
+        // runAllTests()
         document.getElementById("app").classList.add("mounted");
     }
 })
 
 const routes = [
-    {path: '/', component: Home},
+    {
+        path: '/', component: Home,
+        props: route => ({errorCode: route.query.errorCode})
+    },
     {path: '/room/:roomId', component: Room, props: true},
     {path: '/room/:roomId.:extension', component: Room, props: true},
 ]

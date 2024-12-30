@@ -74,8 +74,14 @@ export default {
       </section>
     `,
     props: {
-        roomId: String,
-        extension: String,
+        roomId: {
+            type: String,
+            required: true
+        },
+        extension: {
+            type: String,
+            required: false
+        }
     },
     data() {
         return {
@@ -114,7 +120,7 @@ export default {
         })
         if (!roomResponse.ok) {
             console.error(`Room ${this.roomId} not found`)
-            this.$router.push("/")
+            this.$router.push({path: "/", query: {errorCode: "roomNotFound"}})
             return
         }
         let roomModel = await roomResponse.json()

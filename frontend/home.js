@@ -5,6 +5,9 @@ import {EditorView} from "@codemirror/view";
 
 export default {
     template: `
+      <div class="announcement announcement--error" v-if="errorCode">
+        {{ errorMessage }}
+      </div>
       <header class="header">
         <h1>Live coding editor</h1>
       </header>
@@ -17,6 +20,12 @@ export default {
       <section id="editor-view">
       </section>
     `,
+    props: {
+        errorCode: {
+            type: String,
+            required: false
+        },
+    },
     mounted() {
         let state = EditorState.create({
             doc: "",
@@ -54,6 +63,15 @@ export default {
                 }
             });
         },
-    }
-
+    },
+    computed: {
+        errorMessage() {
+            switch (this.errorCode) {
+                case "roomNotFound":
+                    return "Room not found. It might have been deleted after a period of inactivity.";
+                default:
+                    return "An error occurred. Error code: `" + this.errorCode + "`)";
+            }
+        }
+    },
 }
