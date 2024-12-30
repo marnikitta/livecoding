@@ -61,6 +61,7 @@ make watch-frontend
 This command will start a watcher that updates `frontend/public/bundle.js` on-the-fly.
 
 ## Deployment
+![deploy badge](https://github.com/marnikitta/livecoding/actions/workflows/deploy.yml/badge.svg)
 
 [livecoding.marnikitta.com](https://livecoding.marnikitta.com) is deployed on a VPS.
 The backend service is managed by systemd. I followed

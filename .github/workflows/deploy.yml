@@ -1,4 +1,4 @@
-name: Deploy livecoding.marnikitta.com service
+name: Deploy livecoding.marnikitta.com
 concurrency: production
 on:
   push:
