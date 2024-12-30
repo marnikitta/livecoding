@@ -10,7 +10,7 @@ export default {
       </header>
       <div class="announcement">
         <form class="name-form" @submit.prevent="createRoom">
-          <label class="name-form__label" for="name">To start coding</label>
+          <label class="name-form__label" for="name">Create a new room to start coding</label>
           <button id="create">Create room</button>
         </form>
       </div>
