@@ -37,8 +37,12 @@ export default {
 
         <ul class="online-sites" v-if="sites.size > 0">
           <!--          <template v-for="index in 3" :key="index">-->
-          <li :style="{background: site.color}"
-              v-for="[s, site] in sites" :key="s">
+          <li
+              class="online-sites__site"
+              :class="{'online-sites__site--hidden': !site.visible,
+              ['online-sites__site--color-' + site.colorIdx]: true}"
+              v-for="[s, site] in sites"
+              :key="s">
             {{ site.name }}<span v-if="siteId === s">&nbsp;(you)</span>
           </li>
           <!--          </template>-->
@@ -51,13 +55,13 @@ export default {
 
       <div class="announcement"
            v-if="roomState === RoomState.waitingForName">
-        <form class="name-form" @submit.prevent="enterRoom(nameInput)">
+        <form class="name-form" @submit.prevent="enterRoom(name)">
           <label class="name-form__label" for="name">To edit the document, introduce yourself</label>
           <input type="text" id="name"
                  maxlength="30"
                  minlength="1"
-                 size="15"
-                 v-model="nameInput" placeholder="Your name"
+                 size="10"
+                 v-model="name" placeholder="Your name"
                  required
                  :disabled="roomState === RoomState.connecting"
                  class="name-input"/>
@@ -86,24 +90,46 @@ export default {
              * @type {CRDTDocument}
              */
             document: shallowRef(new CRDTDocument()),
-            nameInput: null,
+            /**
+             * @type {EditorView|null}
+             */
+            view: shallowRef(null),
+            name: null,
             sites: new Map(),
             lastHeartbitTs: null,
             compactionRequired: false,
+            readonlyCompartment: shallowRef(new Compartment())
         }
     },
+
+    created() {
+        document.addEventListener('visibilitychange', this.visibilityChange, false);
+    },
+
     async mounted() {
         console.log("Room mounted", {roomId: this.roomId, extension: this.extension})
 
-        this.readonlyCompartment = new Compartment()
+        let roomResponse = await fetch(`/resource/room/${this.roomId}`, {
+            method: "GET",
+        })
+        if (!roomResponse.ok) {
+            console.error(`Room ${this.roomId} not found`)
+            this.$router.push("/")
+            return
+        }
+        let roomModel = await roomResponse.json()
+        console.info(`Fetched a room with ${roomModel.events.length} events. Settings:`, roomModel.settings)
+        this.settings = roomModel.settings
 
         let state = EditorState.create({
             doc: this.document.getText(),
             extensions: [
-                this.readonlyCompartment.of([EditorView.editable.of(false),
-                    EditorState.readOnly.of(true)]),
-                ...defaultExtensions,
+                this.readonlyCompartment.of([
+                    EditorView.editable.of(false),
+                    EditorState.readOnly.of(true)
+                ]),
                 getLanguageByExtension(this.extension),
+                ...defaultExtensions,
                 EditorView.updateListener.of(update => {
                     try {
                         this.onViewUpdate(update)
@@ -122,18 +148,6 @@ export default {
             state: state,
             parent: document.getElementById("editor-view"),
         });
-
-        let roomResponse = await fetch(`/resource/room/${this.roomId}`, {
-            method: "GET",
-        })
-        if (!roomResponse.ok) {
-            console.error(`Room ${this.roomId} not found`)
-            this.$router.push("/")
-            return
-        }
-        let roomModel = await roomResponse.json()
-        console.info(`Fetched a room with ${roomModel.events.length} events. Settings:`, roomModel.settings)
-        this.settings = roomModel.settings
 
         // initial setup
         this.dispatchCrdtEvent(roomModel.events);
@@ -172,15 +186,27 @@ export default {
 
         this.socket = socket
     },
+    watch: {
+        roomState(newValue) {
+            let readonly = newValue !== RoomState.editing
+
+            this.view.dispatch({
+                effects:
+                    [this.readonlyCompartment.reconfigure([EditorView.editable.of(!readonly),
+                        EditorState.readOnly.of(readonly)])]
+            })
+        }
+    },
     methods: {
         enterRoom(name) {
             console.info("Entering the room as", name)
             // this.$router.replace({query: {name: name}});
 
-            this.socket.send(JSON.stringify({siteHello: {"name": name, "siteId": this.siteId}}))
-            this.setReadonly(false)
-            this.roomState = RoomState.editing
+            this.socket.send(JSON.stringify({sitePresence: {"name": name, "siteId": this.siteId, "visible": true}}))
+            this.name = name
             sessionStorage.setItem(this.roomId, JSON.stringify({name}));
+
+            this.roomState = RoomState.editing
         },
         terminateEverything(compactionRequired = false) {
             if (this.roomState === RoomState.terminated) {
@@ -188,7 +214,6 @@ export default {
                 return
             }
             console.error("Terminating everything");
-            this.setReadonly(true);
             this.sites.clear();
             this.compactionRequired = compactionRequired
             this.siteId = null;
@@ -220,11 +245,13 @@ export default {
                 }
             } else if ("crdtEvents" in msg) {
                 this.dispatchCrdtEvent(msg.crdtEvents);
-            } else if ("siteHello" in msg) {
-                console.info("New site", msg.siteHello)
-                this.sites.set(msg.siteHello.siteId, {
-                    "name": msg.siteHello.name,
-                    "color": allColors[msg.siteHello.siteId % allColors.length]
+            } else if ("sitePresence" in msg) {
+                console.info("New site", msg.sitePresence)
+                let presence = msg.sitePresence
+                this.sites.set(presence.siteId, {
+                    "name": presence.name,
+                    "visible": presence.visible,
+                    "colorIdx": presence.siteId % allColors.length
                 })
             } else if ("siteDisconnected" in msg) {
                 console.info("Site disconnected", msg.siteDisconnected)
@@ -240,11 +267,6 @@ export default {
             }
         },
         setReadonly(readonly) {
-            this.view.dispatch({
-                effects:
-                    [this.readonlyCompartment.reconfigure([EditorView.editable.of(!readonly),
-                        EditorState.readOnly.of(readonly)])]
-            })
         },
         /**
          * @param {CRDTEvent[]} events
@@ -318,6 +340,25 @@ export default {
         },
         reload() {
             window.location.reload()
+        },
+        visibilityChange() {
+            if (this.roomState === RoomState.editing) {
+                let visible = Boolean(!document.hidden)
+
+                if (visible) {
+                    console.info("Document visible")
+                } else {
+                    console.info("Document document hidden")
+                }
+
+                this.socket.send(JSON.stringify({
+                    sitePresence: {
+                        siteId: this.siteId,
+                        name: this.name,
+                        visible: visible
+                    }
+                }))
+            }
         }
     }
 }

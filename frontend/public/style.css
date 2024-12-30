@@ -35,6 +35,14 @@ ol, ul, menu {
     --color-red: #C82829;
     --color-yellow: #F5E642FF;
     --color-orange: #F5871F;
+
+    --color-sites-1: #8959A8;
+    --color-sites-2: #F5871F;
+    --color-sites-3: #3E999F;
+    --color-sites-4: #C82829;
+    --color-sites-5: #C99E00;
+    --color-sites-6: #718C00;
+    --color-sites-7: #C82829;
 }
 
 html {
@@ -176,11 +184,44 @@ a:hover {
     }
 }
 
-.online-sites li {
+.online-sites__site {
+    background-color: var(--color-orange);
     color: var(--color-white);
     /* the same as buttons */
     padding: 0.2rem 0.55rem;
     border-radius: 0.15rem;
+}
+
+.online-sites__site--color-1 {
+    background-color: var(--color-sites-1);
+}
+
+.online-sites__site--color-2 {
+    background-color: var(--color-sites-2);
+}
+
+.online-sites__site--color-3 {
+    background-color: var(--color-sites-3);
+}
+
+.online-sites__site--color-4 {
+    background-color: var(--color-sites-4);
+}
+
+.online-sites__site--color-5 {
+    background-color: var(--color-sites-5);
+}
+
+.online-sites__site--color-6 {
+    background-color: var(--color-sites-6);
+}
+
+.online-sites__site--color-7 {
+    background-color: var(--color-sites-7);
+}
+
+.online-sites__site--hidden {
+    filter: opacity(50%);
 }
 
 .name-form {

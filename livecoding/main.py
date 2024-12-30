@@ -93,8 +93,8 @@ async def websocket_endpoint(room: Annotated[Room, Depends(room_provider)], webs
                 await room.apply_events(msg.crdtEvents, sender=site_id)
                 if room.events_len > settings.events_compaction_limit:
                     await room_repository.compact_room(room.room_id)
-            elif msg.siteHello is not None:
-                await room.apply_hello(msg.siteHello)
+            elif msg.sitePresence is not None:
+                await room.apply_presence(msg.sitePresence, sender=site_id)
             else:
                 raise ValueError(f"Invalid message: {msg}")
     except FullLogException:

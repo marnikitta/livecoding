@@ -53,9 +53,10 @@ class CrdtEventModel(BaseModel):
         )
 
 
-class SiteHello(BaseModel):
+class SitePresence(BaseModel):
     siteId: int
     name: str = Field(min_length=1, max_length=30)
+    visible: bool
 
 
 class SiteDisconnected(BaseModel):
@@ -68,7 +69,7 @@ class SetSiteId(BaseModel):
 
 class WsMessage(BaseModel):
     setSiteId: Optional[SetSiteId] = None
-    siteHello: Optional[SiteHello] = None
+    sitePresence: Optional[SitePresence] = None
     siteDisconnected: Optional[SiteDisconnected] = None
     crdtEvents: Optional[list[CrdtEventModel]] = None
     heartbit: Optional[bool] = None

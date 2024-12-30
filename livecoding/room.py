@@ -11,7 +11,7 @@ from fastapi.websockets import WebSocket
 from starlette.websockets import WebSocketState, WebSocketDisconnect
 
 from livecoding.document import CrdtDocument, CrdtEventInternal, GlobalIdInternal
-from livecoding.model import WsMessage, SiteDisconnected, CrdtEventModel, SiteHello, EventType, GlobalIdModel
+from livecoding.model import WsMessage, SiteDisconnected, CrdtEventModel, SitePresence, EventType, GlobalIdModel
 from livecoding.settings import settings
 from livecoding.utils import generate_phonetic_name
 
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 class Site:
     def __init__(self, site_id: int, websocket: WebSocket):
         self.site_id = site_id
-        self.name: Optional[str] = None
+        self.last_presence: Optional[SitePresence] = None
         self._websocket = websocket
 
     async def send_message(self, message: WsMessage):
@@ -108,17 +108,18 @@ class Room:
                 # coroutine
                 continue
             other_site = self.sites[other_site_id]
-            if other_site.name is not None:
-                await site.send_message(WsMessage(siteHello=SiteHello(siteId=other_site.site_id, name=other_site.name)))
+            if other_site.last_presence is not None:
+                await site.send_message(WsMessage(sitePresence=other_site.last_presence))
 
     def get_model_events(self, offset: int = 0) -> list[CrdtEventModel]:
         return [CrdtEventModel.from_internal(e) for e in self._events[offset:]]
 
-    async def apply_events(self, crdt_events: list[CrdtEventModel], sender: Optional[int] = None):
-        if sender is not None:
-            for event in crdt_events:
-                if event.type == EventType.insert:
-                    assert event.gid.siteId == sender, "Insertions must be sent by the site"
+    async def apply_events(self, crdt_events: list[CrdtEventModel], sender: int):
+        assert sender in self.sites, "Sender must be connected to the room"
+        assert self.sites[sender].last_presence is not None, "Sender must have presence set"
+        for event in crdt_events:
+            if event.type == EventType.insert:
+                assert event.gid.siteId == sender, "Insertions must be sent by the site"
 
         self._append_events(crdt_events)
         await self.broadcast(WsMessage(crdtEvents=crdt_events), sender)
@@ -139,9 +140,10 @@ class Room:
     def events_len(self) -> int:
         return len(self._events)
 
-    async def apply_hello(self, site_hello: SiteHello):
-        self.sites[site_hello.siteId].name = site_hello.name
-        await self.broadcast(WsMessage(siteHello=site_hello))
+    async def apply_presence(self, presence: SitePresence, sender: int):
+        assert presence.siteId == sender, "Hello must be sent by the site"
+        self.sites[presence.siteId].last_presence = presence
+        await self.broadcast(WsMessage(sitePresence=presence))
 
     async def broadcast(self, message: WsMessage, sender: Optional[int] = None):
         for site in list(self.sites.values()):

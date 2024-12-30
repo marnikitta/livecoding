@@ -23,9 +23,10 @@
 - [x] Focus on the name field. Focus on the code after room creation
 - [x] Stretch code editor
 - [x] Record a GIF with an editor
+- [x] Add visibility presence highlighting
+- [ ] Pretty "room not found" error
 - [ ] Add favicon and the rest of the stuff
 - [ ] Fix messed up input border
-- [ ] Pretty "room not found" error
 - [ ] Presence tooltips
 - [ ] Call intro.js during create and handle update afterwards
 - [ ] Automatic reconnect
@@ -42,10 +43,10 @@
 - [x] Benchmark file sizes
 - [x] Tune WebSocket ping-pong timeout to match client heartbeats
 - [x] Prettify code for publishing
-- [ ] Fix UTF-16 (javascript) vs UTF-32 (python) handling
+- [x] Remove rooms older than one week (include this message in the greeting)
+- [ ] Fix UTF16 (javascript) vs UTF-32 (python) handling
   - https://tonsky.me/blog/unicode/
   - https://hsivonen.fi/string-length/
-- [ ] Remove rooms older than one week (include this message in the greeting)
 - [ ] Create docker image for easy self-hosting
   - Replicate hastebin settings and extract them to ENV variables
 - 
