@@ -41,11 +41,14 @@
 - [x] Add greeting message
 - [x] Benchmark file sizes
 - [x] Tune WebSocket ping-pong timeout to match client heartbeats
-- [ ] Replicate hastebin settings and extract them to ENV variables
+- [x] Prettify code for publishing
+- [ ] Fix UTF-16 (javascript) vs UTF-32 (python) handling
+  - https://tonsky.me/blog/unicode/
+  - https://hsivonen.fi/string-length/
 - [ ] Remove rooms older than one week (include this message in the greeting)
-- [ ] Prettify code for publishing
-    - Add kudos and all used links
-
+- [ ] Create docker image for easy self-hosting
+  - Replicate hastebin settings and extract them to ENV variables
+- 
 ## Server:
 
 - [x] Remove server from 0.0.0.0
