@@ -22,11 +22,11 @@
 - [x] Revising 37signals paddings and margins. Probably need to change everything to ems instead of rems
 - [x] Focus on the name field. Focus on the code after room creation
 - [x] Stretch code editor
+- [x] Record a GIF with an editor
 - [ ] Add favicon and the rest of the stuff
-- [ ] Record a GIF with an editor
+- [ ] Fix messed up input border
 - [ ] Pretty "room not found" error
 - [ ] Presence tooltips
-- [ ] Add new document placeholder
 - [ ] Call intro.js during create and handle update afterwards
 - [ ] Automatic reconnect
 - [ ] Add jslint
@@ -41,6 +41,7 @@
 - [x] Add greeting message
 - [x] Benchmark file sizes
 - [x] Tune WebSocket ping-pong timeout to match client heartbeats
+- [ ] Replicate hastebin settings and extract them to ENV variables
 - [ ] Remove rooms older than one week (include this message in the greeting)
 - [ ] Prettify code for publishing
     - Add kudos and all used links
@@ -54,8 +55,9 @@
 - [x] Test reboot
 - [x] What is wrong with SSH settings? I moved it to 2222
 - [x] Add UFW firewall
+- [x] Set up GitHub action for deployment
+- [ ] Add known_hosts to the deployment script
 - [ ] Set up restart cron
 - [ ] How do restarts work? Is there a limit?
-- [ ] Set up GitHub action for deployment
 - [ ] Add rate limiter. Stress test it
-- [ ] Overwrite 404
+- [ ] Overwrite 404 nginx error with something fun

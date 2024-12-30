@@ -3,4 +3,5 @@ node_modules
 data
 frontend/public/bundle.js
 frontend/public/bundle.js.map
+frontend/public/meta.json
 __pycache__

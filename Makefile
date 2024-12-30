@@ -29,12 +29,16 @@ watch_front: node_modules
 $(bundle_path): node_modules FORCE
 	node_modules/.bin/esbuild frontend/app.js --minify --bundle --outfile=$(bundle_path)
 
+metafile: node_modules FORCE
+	# https://esbuild.github.io/analyze/
+	node_modules/.bin/esbuild frontend/app.js --bundle --minify --metafile=frontend/public/meta.json --outfile=$(bundle_path)
+
 node_modules: package.json package-lock.json
 	npm install
 
 clean:
 	rm -rf node_modules
-	rm -rf static/dist
+	rm $(bundle_path)
 	rm -rf .venv
 
 # Deployment scripts

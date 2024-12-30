@@ -103,9 +103,9 @@ async def websocket_endpoint(room: Annotated[Room, Depends(room_provider)], webs
 
 async def cleanup_task():
     while True:
+        await asyncio.sleep(settings.rooms_gc_interval)
         room_repository.flush_rooms()
         await room_repository.gc()
-        await asyncio.sleep(10)
 
 
 @app.get("/resource/intro.js", response_class=PlainTextResponse)
@@ -116,7 +116,7 @@ async def get_intro() -> str:
     total_rooms = room_repository.total_rooms(round(time.time() / 30))
     uptime = format_uptime(started_at, datetime.datetime.now())
     if settings.repository:
-        stars = get_stars("marnikitta/livecoding", round(time.time() / 60))
+        stars = get_stars(settings.repository, round(time.time() / 60))
     else:
         stars = None
 
@@ -129,8 +129,7 @@ async def get_intro() -> str:
 // Sources are available at 
 // https://github.com/marnikitta/livecoding
 
-// Real-time stats:
-const stats = {{
+const liveStats = {{
     activeRooms: {active_rooms},
     activeUsers: {active_users},
     totalRooms: {total_rooms},
@@ -139,11 +138,12 @@ const stats = {{
 }};
 
 // Server config:
-const config = {{
+const serverConfig = {{
     heartbitInterval: {settings.heartbit_interval},
     documentSizeLimit: {settings.document_size_limit},
     eventsCompactionLimit: {settings.events_compaction_limit},
     eventsHardLimit: {settings.events_hard_limit},
+    roomsGcInterval: {settings.rooms_gc_interval},
 }};
 
 // Pro tip: To change code highlighting, 
