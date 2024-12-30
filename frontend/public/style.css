@@ -34,7 +34,7 @@ ol, ul, menu {
     --color-grey-dark: rgb(15, 21, 27);
     --color-red: #C82829;
     --color-yellow: #F5E642FF;
-    --color-purple: #8959A8;
+    --color-orange: #F5871F;
 }
 
 html {
@@ -82,9 +82,15 @@ input:disabled {
     border-color: var(--color-grey-light);
 }
 
+/*input:focus-visible {*/
+/*    outline: none;*/
+/*    border-color: var(--color-orange);*/
+/*}*/
+
 button {
-    border-color: var(--color-grey-dark);
-    background-color: var(--color-grey-dark);
+    border: 0;
+    border-color: var(--color-orange);
+    background-color: var(--color-orange);
     color: var(--color-white);
 }
 

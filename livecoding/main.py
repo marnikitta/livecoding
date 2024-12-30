@@ -5,7 +5,7 @@ import sys
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Optional
 
 import uvicorn
 from fastapi import FastAPI, WebSocket, HTTPException, Depends
@@ -38,12 +38,14 @@ room_repository: RoomRepository = RoomRepository(root=Path("./data"))
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # noinspection PyAsyncCall
-    asyncio.create_task(cleanup_task())
+    fl = asyncio.create_task(flush_task())
+    pr = asyncio.create_task(rooms_purge_task())
     try_notify_systemd()
     yield
     logger.info("Terminating application. Flushing all rooms")
     room_repository.flush_rooms()
+    fl.cancel()
+    pr.cancel()
 
 
 app = FastAPI(lifespan=lifespan)
@@ -75,12 +77,14 @@ async def websocket_endpoint(room: Annotated[Room, Depends(room_provider)], webs
     site_id = room.get_next_site_id()
     site = Site(site_id, websocket)
 
+    heartbit_task: Optional[asyncio.Task] = None
+
     try:
         await room.connect(site, offset)
         assert await websocket.receive_text() == "Hello", "First message must be Hello"
 
         await site.send_message(WsMessage(setSiteId=SetSiteId(siteId=site_id)))
-        _ = asyncio.create_task(site.heartbit_task(settings.heartbit_interval))
+        heartbit_task = asyncio.create_task(site.heartbit_task(settings.heartbit_interval))
 
         while True:
             msg = await site.receive_message()
@@ -99,13 +103,22 @@ async def websocket_endpoint(room: Annotated[Room, Depends(room_provider)], webs
         pass
     finally:
         await room.disconnect(site_id)
+        if heartbit_task is not None:
+            heartbit_task.cancel()
 
 
-async def cleanup_task():
+async def flush_task():
     while True:
-        await asyncio.sleep(settings.rooms_gc_interval)
+        await asyncio.sleep(settings.rooms_flush_interval)
         room_repository.flush_rooms()
         await room_repository.gc()
+
+
+async def rooms_purge_task():
+    while True:
+        room_repository.purge_stale_rooms(settings.rooms_ttl_days)
+        # on start-up and then hourly
+        await asyncio.sleep(60 * 60)
 
 
 @app.get("/resource/intro.js", response_class=PlainTextResponse)
@@ -126,8 +139,7 @@ async def get_intro() -> str:
 // 2. Share the link with friends
 // 3. Start coding together!
 
-// Sources are available at 
-// https://github.com/marnikitta/livecoding
+// Sources are available at https://github.com/marnikitta/livecoding
 
 const liveStats = {{
     activeRooms: {active_rooms},
@@ -143,11 +155,13 @@ const serverConfig = {{
     documentSizeLimit: {settings.document_size_limit},
     eventsCompactionLimit: {settings.events_compaction_limit},
     eventsHardLimit: {settings.events_hard_limit},
-    roomsGcInterval: {settings.rooms_gc_interval},
+    roomsFlushInterval: {settings.rooms_flush_interval},
+    roomsTtlDays: {settings.rooms_ttl_days},
 }};
 
-// Pro tip: To change code highlighting, 
-//   change file extension in the URL,
+// NB: The server will remove rooms after {settings.rooms_ttl_days} days of inactivity
+
+// Pro tip: To change code highlighting, change file extension in the URL,
 //   e.g. /room/emutilusejaxok.css for CSS
 """
 

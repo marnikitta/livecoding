@@ -302,6 +302,15 @@ class RoomRepository:
         saved_rooms |= set(self.rooms.keys())
         return len(saved_rooms)
 
+    def purge_stale_rooms(self, ttl_days: int) -> None:
+        now = time.time()
+        ttl_seconds = ttl_days * 24 * 60 * 60
+        for p in self.root.iterdir():
+            mtime = now - p.stat().st_mtime
+            if mtime > ttl_seconds:
+                p.unlink()
+                logger.info(f"Removed stale room {p.name}. It was inactive for {mtime / 60 / 60 / 24:.1f} days")
+
 
 def test_from_text():
     text = "Hello, World!"
