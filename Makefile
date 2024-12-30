@@ -10,7 +10,9 @@ all: build
 run: build
 	poetry run python -m livecoding.main
 
-build: .venv $(bundle_path)
+build: .venv build_front
+
+build_front: $(bundle_path)
 
 lint: .venv
 	poetry run mypy --check-untyped-defs --ignore-missing-imports livecoding
@@ -57,4 +59,4 @@ view-log:
 
 FORCE:
 
-.PHONY: all build clean run lint watch_front clean deploy stop-deploy
+.PHONY: all build clean run lint watch_front clean deploy stop-deploy build_front
