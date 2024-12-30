@@ -64,11 +64,10 @@ This command will start a watcher that updates `frontend/public/bundle.js` on-th
 
 [livecoding.marnikitta.com](https://livecoding.marnikitta.com) is deployed on a VPS.
 The backend service is managed by systemd. I followed
-[Writing a systemd Service in Python](https://github.com/torfsen/python-systemd-tutorial]) article.
-The frontend is served via nginx. It also serves as a reverse proxy for the backend. HTTPS is provided by Let's Encrypt.
+[Writing a systemd Service in Python](https://github.com/torfsen/python-systemd-tutorial) article.
+The frontend is served via nginx. It also acts as a reverse proxy for the backend. HTTPS is provided by Let's Encrypt.
 
-This setup is inspired by article [How I run my servers](https://blog.wesleyac.com/posts/how-i-run-my-servers).
-out.
+This setup is inspired by [How I run my servers](https://blog.wesleyac.com/posts/how-i-run-my-servers) article.
 
 nginx configuration and unit file are not included in this repository.
 
@@ -78,4 +77,4 @@ To build the frontend for production:
 make build-frontend
 ```
 
-It will create a minified frontend/public/bundle.js.
+It will create a minified `frontend/public/bundle.js`.
