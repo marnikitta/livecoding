@@ -183,7 +183,7 @@ def create_from_text(room_id: str, text: str) -> Room:
     events = []
     for i, t in enumerate(text):
         gid = GlobalIdInternal(counter=i, siteId=RoomRepository.UTIL_SITE_ID)
-        events.append(CrdtEventInternal(type=EventType.insert, gid=gid, afterGid=prev_gid, char=t))
+        events.append(CrdtEventInternal(type=EventType.insert, gid=gid, after_gid=prev_gid, char=t))
         prev_gid = gid
 
     room = Room(room_id, initial_events=events)

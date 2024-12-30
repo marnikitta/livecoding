@@ -175,21 +175,4 @@ if __name__ == "__main__":
         workers=1,
         ws_ping_timeout=settings.heartbit_interval,
         ws_ping_interval=settings.heartbit_interval,
-        # reload=True
     )
-
-
-def fizzbuzz(n: int):
-    for x in range(n):
-        if x % 3 == 0 and x % 5 == 0:
-            print("fizz buzz")
-        elif x % 3 == 0:
-            print("fizz")
-        elif x % 5 == 0:
-            print("buzz")
-        else:
-            print(x)
-
-
-def main():
-    print(fizzbuzz(20))

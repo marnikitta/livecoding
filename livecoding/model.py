@@ -40,7 +40,7 @@ class CrdtEventModel(BaseModel):
             type=self.type,
             gid=self.gid.to_internal(),
             char=self.char,
-            afterGid=self.afterGid.to_internal() if self.afterGid else None,
+            after_gid=self.afterGid.to_internal() if self.afterGid else None,
         )
 
     @staticmethod
@@ -49,7 +49,7 @@ class CrdtEventModel(BaseModel):
             type=internal.type,
             gid=GlobalIdModel.from_internal(internal.gid),
             char=internal.char,
-            afterGid=GlobalIdModel.from_internal(internal.afterGid) if internal.afterGid else None,
+            afterGid=GlobalIdModel.from_internal(internal.after_gid) if internal.after_gid else None,
         )
 
 

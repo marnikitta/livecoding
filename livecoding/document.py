@@ -14,12 +14,12 @@ class GlobalIdInternal:
     siteId: int
 
 
-@dataclasses.dataclass(slots=True)
+@dataclasses.dataclass(slots=True, frozen=True)
 class CrdtEventInternal:
     type: EventType
     gid: GlobalIdInternal
     char: Optional[str] = None
-    afterGid: Optional[GlobalIdInternal] = None
+    after_gid: Optional[GlobalIdInternal] = None
 
 
 @dataclasses.dataclass(slots=True)
@@ -45,8 +45,8 @@ class CrdtDocument:
             return
 
         prev_entry = None
-        if event.afterGid is not None:
-            prev_entry = self.gid_to_entry[event.afterGid]
+        if event.after_gid is not None:
+            prev_entry = self.gid_to_entry[event.after_gid]
 
         next_entry = prev_entry.next_entry if prev_entry is not None else self.head
 
@@ -90,13 +90,13 @@ def test_document():
             type=EventType.insert,
             gid=GlobalIdInternal(counter=1, siteId=1),
             char="b",
-            afterGid=GlobalIdInternal(counter=0, siteId=1),
+            after_gid=GlobalIdInternal(counter=0, siteId=1),
         )
     )
     assert document.materialize() == "ab"
 
     document.apply(
-        CrdtEventInternal(type=EventType.insert, gid=GlobalIdInternal(counter=2, siteId=1), char="c", afterGid=None)
+        CrdtEventInternal(type=EventType.insert, gid=GlobalIdInternal(counter=2, siteId=1), char="c", after_gid=None)
     )
     assert document.materialize() == "cab"
 
