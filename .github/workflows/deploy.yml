@@ -1,4 +1,5 @@
 name: Deploy livecoding.marnikitta.com service
+concurrency: production
 on:
   push:
     branches:
