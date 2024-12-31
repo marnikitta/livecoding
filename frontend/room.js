@@ -118,9 +118,13 @@ export default {
         let roomResponse = await fetch(`/resource/room/${this.roomId}`, {
             method: "GET",
         })
-        if (!roomResponse.ok) {
+        if (roomResponse.status === 404) {
             console.error(`Room ${this.roomId} not found`)
             this.$router.push({path: "/", query: {errorCode: "roomNotFound"}})
+            return
+        } else if (!roomResponse.ok) {
+            console.error(`Got an error while fetching room ${this.roomId}`, roomResponse)
+            this.$router.push({path: "/", query: {errorCode: "unknownError"}})
             return
         }
         let roomModel = await roomResponse.json()

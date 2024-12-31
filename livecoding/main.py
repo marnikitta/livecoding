@@ -128,18 +128,15 @@ async def get_intro() -> str:
     # smart way to cache for 5 seconds
     total_rooms = room_repository.total_rooms(round(time.time() / 30))
     uptime = format_uptime(started_at, datetime.datetime.now())
-    if settings.repository:
-        stars = get_stars(settings.repository, round(time.time() / 60))
-    else:
-        stars = None
+    stars = get_stars(settings.repository, round(time.time() / 60))
 
-    return f"""// Welcome to livecoding.marnikitta.com
+    return f"""// Welcome!
 //
 // 1. Create a new room
 // 2. Share the link with friends
 // 3. Start coding together!
 
-// Sources are available at https://github.com/marnikitta/livecoding
+// Sources are available at https://github.com/{settings.repository}
 
 const liveStats = {{
     activeRooms: {active_rooms},

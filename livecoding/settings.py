@@ -1,5 +1,3 @@
-from typing import Optional
-
 from pydantic import BaseModel
 
 
@@ -10,24 +8,24 @@ class Settings(BaseModel):
     Client checks if connection is alive by asserting
     that it receives a message every `heartbit_interval` seconds.
     """
-    events_hard_limit: int = 250_000
+    events_hard_limit: int = 200_000
     """
     If client sends crdt event that would exceed this limit,
     it will be disconnected from the room
     """
-    events_compaction_limit: int = 150_000
+    events_compaction_limit: int = 75_000
     """
     If room events count exceeds this limit,
     server will disconnect all clients and flush the room.
     After reconnection, all tombstones and change history will be lost.
     """
-    document_size_limit: int = 50_000
+    document_size_limit: int = 25_000
     """
     Maximum document size in characters.
     Client-side limit to play nice with server limits.
     On connection server sends this setting to clients.
     """
-    max_sites: int = 100
+    max_sites: int = 20
     """
     Maximum number of sites in a room.
     """
@@ -41,7 +39,7 @@ class Settings(BaseModel):
     Room time-to-live in seconds.
     Rooms are deleted after this time of inactivity.
     """
-    repository: Optional[str] = "marnikitta/livecoding"
+    repository: str = "marnikitta/livecoding"
     """
     GitHub repository to fetch stars count.
     """
