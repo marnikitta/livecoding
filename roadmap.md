@@ -27,6 +27,7 @@
 - [x] Add favicon and the rest of the stuff
 - [x] Pretty "room not found" error
 - [x] Fix messed up input border
+- [ ] Investigate stuck users
 - [ ] Presence tooltips
 - [ ] Automatic reconnect
 - [ ] Add jslint
