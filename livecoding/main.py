@@ -51,6 +51,11 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 
+@app.get("/resources/health")
+async def health():
+    return {"status": "ok"}
+
+
 @app.post("/resource/room")
 async def create_room() -> RoomModel:
     room: Room = room_repository.create()
