@@ -1,5 +1,6 @@
 """
-There are two implementations of GlobalId and CrdtEvent classes. One is using dataclasses and the other is using pydantic.
+There are two implementations of GlobalId and CrdtEvent classes.
+One is using dataclasses and the other is using pydantic.
 The main reason is that pydantic classes are enormous. They are 10 times bigger than dataclasses.
 However, they can be used for serde and validation. After receiving, they are converted to internal dataclasses.
 """
@@ -11,8 +12,7 @@ import tracemalloc
 from pydantic import BaseModel, Field
 from typing_extensions import Annotated
 
-from livecoding.document import GlobalIdInternal, EventType, CrdtEventInternal
-from livecoding.settings import settings
+from livecoding.domain.document import GlobalIdInternal, EventType, CrdtEventInternal
 
 logger = logging.getLogger(__name__)
 
@@ -74,17 +74,6 @@ class WsMessage(BaseModel):
     crdtEvents: Optional[list[CrdtEventModel]] = None
     heartbit: Optional[bool] = None
     compactionRequired: Optional[bool] = None
-
-
-class RoomSettings(BaseModel):
-    documentLimit: int = settings.document_size_limit
-    heartbitInterval: int = settings.heartbit_interval
-
-
-class RoomModel(BaseModel):
-    roomId: str
-    events: list[CrdtEventModel]
-    settings: RoomSettings = RoomSettings()
 
 
 def test_memory_usage():

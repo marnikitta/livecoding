@@ -4,6 +4,7 @@ import random
 
 import logging
 import socket
+import sys
 from functools import lru_cache
 from typing import Optional
 
@@ -79,6 +80,15 @@ def get_stars(repository: str, cache_ts: int) -> Optional[int]:
     except Exception as e:
         logger.exception("Failed to fetch stars", e)
         return None
+
+
+def configure_logging():
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.INFO)
+
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(logging.Formatter("%(levelname)s %(name)s: %(message)s"))
+    root_logger.addHandler(handler)
 
 
 if __name__ == "__main__":

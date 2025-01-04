@@ -1,43 +1,65 @@
 import asyncio
 import datetime
 import logging
-import sys
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Annotated
 
+import typer
 import uvicorn
 from fastapi import FastAPI, WebSocket, HTTPException, APIRouter
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 from starlette.responses import FileResponse, PlainTextResponse
 from starlette.websockets import WebSocketDisconnect
 
-from livecoding.model import WsMessage, SetSiteId, RoomModel
-from livecoding.room import Room, Site, RoomRepository, FullLogException
-from livecoding.settings import settings
-from livecoding.utils import try_notify_systemd, format_uptime, get_stars
+from livecoding.domain.message import CrdtEventModel, WsMessage, SetSiteId
+from livecoding.domain.room import Room, Site, RoomRepository, FullLogException
+from livecoding.utils import try_notify_systemd, format_uptime, get_stars, configure_logging
 
-
-def configure_logging():
-    root_logger = logging.getLogger()
-    root_logger.setLevel(logging.INFO)
-
-    handler = logging.StreamHandler(sys.stdout)
-    handler.setFormatter(logging.Formatter("%(levelname)s %(name)s: %(message)s"))
-    root_logger.addHandler(handler)
-
-
-configure_logging()
 logger = logging.getLogger(__name__)
 
 
+class RoomSettings(BaseModel):
+    documentLimit: int
+    heartbitInterval: int
+
+
+class RoomModel(BaseModel):
+    roomId: str
+    events: list[CrdtEventModel]
+    settings: RoomSettings
+
+
 class LivecodingApp:
-    def __init__(self, serve_static: bool = True):
+    def __init__(
+        self,
+        *,
+        data_root: Path = Path("./data"),
+        serve_static: bool = True,
+        heartbit_interval: int = 5,
+        room_compaction_threshold: int = 75_000,
+        room_events_limit: int = 200_000,
+        room_sites_limit: int = 20,
+        document_length_limit: int = 25_000,
+        room_ttl_days: Optional[int] = 30,
+        flush_interval: int = 10,
+    ):
         self.started_at = datetime.datetime.now()
+        self.heartbit_interval = heartbit_interval
+        self.flush_interval = flush_interval
+
+        self.room_repository = RoomRepository(
+            root=data_root,
+            compaction_threshold=room_compaction_threshold,
+            ttl_days=room_ttl_days,
+            room_events_limit=room_events_limit,
+            room_sites_limit=room_sites_limit,
+            document_length_limit=document_length_limit,
+        )
 
         self.app: FastAPI = FastAPI(lifespan=self.lifespan)
-        self.room_repository: RoomRepository = RoomRepository(root=Path("./data"))
         self.app.mount("/", self.init_router(serve_static))
 
     def init_router(self, serve_static: bool) -> APIRouter:
@@ -46,7 +68,7 @@ class LivecodingApp:
         resource_router = APIRouter()
         resource_router.add_api_route("/health", self.health)
         resource_router.add_api_route("/room", self.create_room, methods=["POST"])
-        resource_router.add_api_route("/room/{room_id}", self.get_room)
+        resource_router.add_api_route("/room/{room_id}", self.get_room_model)
         resource_router.add_api_websocket_route("/room/{room_id}/ws", self.websocket_endpoint)
         resource_router.add_api_route("/intro.js", self.get_intro, response_class=PlainTextResponse)
 
@@ -63,7 +85,7 @@ class LivecodingApp:
 
     @asynccontextmanager
     async def lifespan(self, _: FastAPI):
-        fl = asyncio.create_task(self.flush_task())
+        fl = asyncio.create_task(self.flush_task(self.flush_interval))
         pr = asyncio.create_task(self.rooms_purge_task())
         try_notify_systemd()
         yield
@@ -77,8 +99,12 @@ class LivecodingApp:
         return {"status": "ok"}
 
     async def create_room(self) -> RoomModel:
-        room = self.room_repository.create()
-        return RoomModel(roomId=room.room_id, events=room.get_model_events())
+        room: Room = self.room_repository.create()
+        return RoomModel(
+            roomId=room.room_id,
+            events=room.get_model_events(),
+            settings=RoomSettings(documentLimit=room.document_length_limit, heartbitInterval=self.heartbit_interval),
+        )
 
     def get_room_or_throw(self, room_id: str) -> Room:
         if not self.room_repository.exists(room_id):
@@ -86,9 +112,13 @@ class LivecodingApp:
 
         return self.room_repository.get(room_id)
 
-    async def get_room(self, room_id: str) -> RoomModel:
+    async def get_room_model(self, room_id: str) -> RoomModel:
         room = self.get_room_or_throw(room_id)
-        return RoomModel(roomId=room.room_id, events=room.get_model_events())
+        return RoomModel(
+            roomId=room.room_id,
+            events=room.get_model_events(),
+            settings=RoomSettings(documentLimit=room.document_length_limit, heartbitInterval=self.heartbit_interval),
+        )
 
     async def websocket_endpoint(self, websocket: WebSocket, room_id: str, offset: int = 0):
         room = self.get_room_or_throw(room_id)
@@ -106,15 +136,14 @@ class LivecodingApp:
             assert await websocket.receive_text() == "Hello", "First message must be Hello"
 
             await site.send_message(WsMessage(setSiteId=SetSiteId(siteId=site_id)))
-            heartbit_task = asyncio.create_task(site.heartbit_task(settings.heartbit_interval))
+            heartbit_task = asyncio.create_task(site.heartbit_task(self.heartbit_interval))
 
             while True:
                 msg = await site.receive_message()
 
                 if msg.crdtEvents is not None:
                     await room.apply_events(msg.crdtEvents, sender=site_id)
-                    if room.events_len > settings.events_compaction_limit:
-                        await self.room_repository.compact_room(room.room_id)
+                    await self.room_repository.try_compact(room.room_id)
                 elif msg.sitePresence is not None:
                     await room.apply_presence(msg.sitePresence, sender=site_id)
                 else:
@@ -128,15 +157,17 @@ class LivecodingApp:
             if heartbit_task is not None:
                 heartbit_task.cancel()
 
-    async def flush_task(self):
+    async def flush_task(self, interval: int):
+        logger.info(f"Starting flush task. Interval: {interval}")
         while True:
-            await asyncio.sleep(settings.rooms_flush_interval)
+            await asyncio.sleep(interval)
             self.room_repository.flush_rooms()
             await self.room_repository.gc()
 
     async def rooms_purge_task(self):
+        logger.info("Starting rooms purge task. Interval: hourly")
         while True:
-            self.room_repository.purge_stale_rooms(settings.rooms_ttl_days)
+            self.room_repository.purge_stale_rooms()
             # on start-up and then hourly
             await asyncio.sleep(60 * 60)
 
@@ -155,15 +186,15 @@ class LivecodingApp:
         # smart way to cache for 5 seconds
         total_rooms = self.room_repository.total_rooms(round(time.time() / 30))
         uptime = format_uptime(self.started_at, datetime.datetime.now())
-        stars = get_stars(settings.repository, round(time.time() / 60))
+        stars = get_stars("marnikitta/livecoding", round(time.time() / 60))
 
-        return f"""// Welcome!
+        return f"""// Hi there! Welcome to Live coding editor!
 //
 // 1. Create a new room
 // 2. Share the link with friends
 // 3. Start coding together!
 
-// Sources are available at https://github.com/{settings.repository}
+// Sources are available at https://github.com/marnikitta/livecoding
 
 const liveStats = {{
     activeRooms: {active_rooms},
@@ -174,31 +205,72 @@ const liveStats = {{
 }};
 
 const serverConfig = {{
-    heartbitInterval: {settings.heartbit_interval},
-    documentSizeLimit: {settings.document_size_limit},
-    eventsCompactionLimit: {settings.events_compaction_limit},
-    eventsHardLimit: {settings.events_hard_limit},
-    roomsFlushInterval: {settings.rooms_flush_interval},
-    roomsTtlDays: {settings.rooms_ttl_days},
+    documentLengthLimit: {self.room_repository.document_length_limit},
+    roomCompactionThreshold: {self.room_repository.compaction_threshold},
+    roomEventsLimit: {self.room_repository.room_events_limit},
+    roomTtlDays: {self.room_repository.ttl_days}
 }};
 
-// NB: The server will remove rooms after {settings.rooms_ttl_days} days of inactivity
+// NB: The server will remove rooms after {self.room_repository.ttl_days} days of inactivity
 
 // Pro tip: To change code highlighting, change file extension in the URL,
 //   e.g. /room/emutilusejaxok.css for CSS
 """
 
 
-if __name__ == "__main__":
-    app = LivecodingApp()
+def main(
+    host: Annotated[
+        str,
+        typer.Option(
+            envvar="HOST", help="The hostname or IP address where the server will run (e.g., 'localhost' or '0.0.0.0')"
+        ),
+    ] = "localhost",
+    port: Annotated[int, typer.Option(envvar="PORT", help="The port number the server will listen on ")] = 5000,
+    data_root: Annotated[
+        Path,
+        typer.Option(
+            envvar="DATA_ROOT",
+            help="The directory to store documents. If it doesn't exist, it will be created on first run",
+        ),
+    ] = Path("./data"),
+    document_length_limit: Annotated[
+        int, typer.Option(envvar="DOCUMENT_LENGTH_LIMIT", help="The maximum allowed size of a document, in characters")
+    ] = 25_000,
+    room_ttl_days: Annotated[
+        int,
+        typer.Option(envvar="ROOM_TTL_DAYS", help="The number of days a room can remain inactive before being deleted"),
+    ] = 30,
+):
+    """
+    Live coding app server
+    """
+    configure_logging()
+
+    # Compaction is launched after pasting max document length, then deleting it and pasting again
+    room_compaction_threshold = document_length_limit * 3
+    # Hard limit is set to allow pasting the whole document after compaction launches,
+    # and only then disconnect
+    room_events_limit = room_compaction_threshold + document_length_limit
+    app = LivecodingApp(
+        data_root=data_root,
+        room_compaction_threshold=room_compaction_threshold,
+        room_events_limit=room_events_limit,
+        room_ttl_days=room_ttl_days,
+    )
 
     uvicorn.run(
         app.app,
-        host="localhost",
+        host=host,
+        port=port,
         access_log=True,
         log_config=None,
-        port=5000,
+        # Workers must be set to 1, because we use in-memory repository
+        # It has to be shared between workers
         workers=1,
-        ws_ping_timeout=settings.heartbit_interval,
-        ws_ping_interval=settings.heartbit_interval,
+        ws_ping_timeout=app.heartbit_interval,
+        ws_ping_interval=app.heartbit_interval,
     )
+
+
+if __name__ == "__main__":
+    typer.run(main)

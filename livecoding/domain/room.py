@@ -10,9 +10,15 @@ from typing import Optional
 from fastapi.websockets import WebSocket
 from starlette.websockets import WebSocketState, WebSocketDisconnect
 
-from livecoding.document import CrdtDocument, CrdtEventInternal, GlobalIdInternal
-from livecoding.model import WsMessage, SiteDisconnected, CrdtEventModel, SitePresence, EventType, GlobalIdModel
-from livecoding.settings import settings
+from livecoding.domain.document import CrdtDocument, CrdtEventInternal, GlobalIdInternal
+from livecoding.domain.message import (
+    WsMessage,
+    SiteDisconnected,
+    CrdtEventModel,
+    SitePresence,
+    EventType,
+    GlobalIdModel,
+)
 from livecoding.utils import generate_phonetic_name
 
 logger = logging.getLogger(__name__)
@@ -41,7 +47,7 @@ class Site:
     async def close(self):
         try:
             await self._websocket.close()
-        except Exception:
+        except RuntimeError:
             pass
 
     async def heartbit_task(self, seconds: int):
@@ -51,7 +57,7 @@ class Site:
                 await asyncio.sleep(seconds)
             except WebSocketDisconnect:
                 break
-            except Exception:
+            except RuntimeError:
                 logger.exception(f"Heartbit task for {self.site_id} failed")
                 break
 
@@ -71,8 +77,10 @@ class Room:
         self,
         room_id: str,
         *,
+        events_limit: int,
+        sites_limit: int,
+        document_length_limit: int,
         initial_events: Optional[list[CrdtEventInternal]] = None,
-        events_limit: int = settings.events_hard_limit,
     ):
         self.room_id = room_id
         self.sites: dict[int, Site] = {}
@@ -80,11 +88,37 @@ class Room:
         self._events: list[CrdtEventInternal] = []
         self._document = CrdtDocument()
         self.events_limit = events_limit
+        self.sites_limit = sites_limit
+        self.document_length_limit = document_length_limit
 
         if initial_events is not None:
             for e in initial_events:
                 self._document.apply(e)
             self._events += initial_events
+
+    @staticmethod
+    def from_text(
+        room_id: str, text: str, *, events_limit: int, sites_limit: int, document_length_limit: int
+    ) -> "Room":
+        prev_gid = None
+
+        events = []
+        for i, t in enumerate(text):
+            gid = GlobalIdInternal(counter=i, siteId=RoomRepository.UTIL_SITE_ID)
+            events.append(CrdtEventInternal(type=EventType.insert, gid=gid, after_gid=prev_gid, char=t))
+            prev_gid = gid
+
+        room = Room(
+            room_id,
+            initial_events=events,
+            events_limit=events_limit,
+            sites_limit=sites_limit,
+            document_length_limit=document_length_limit,
+        )
+
+        materialized_text = room.materialize()
+        assert materialized_text == text
+        return room
 
     def get_next_site_id(self) -> int:
         max_event_id = max([e.gid.siteId for e in self._events], default=0)
@@ -94,7 +128,7 @@ class Room:
         if site.site_id in self.sites:
             raise ValueError(f"Site with id {site.site_id} already connected to room {self.room_id}")
 
-        if len(self.sites) >= settings.max_sites:
+        if len(self.sites) >= self.sites_limit:
             raise ValueError(f"Room {self.room_id} is full")
 
         self.sites[site.site_id] = site
@@ -179,36 +213,42 @@ class Room:
         return self._document.materialize()
 
 
-def create_from_text(room_id: str, text: str) -> Room:
-    prev_gid = None
-
-    events = []
-    for i, t in enumerate(text):
-        gid = GlobalIdInternal(counter=i, siteId=RoomRepository.UTIL_SITE_ID)
-        events.append(CrdtEventInternal(type=EventType.insert, gid=gid, after_gid=prev_gid, char=t))
-        prev_gid = gid
-
-    room = Room(room_id, initial_events=events)
-
-    materialized_text = room.materialize()
-    assert materialized_text == text
-    return room
-
-
 class RoomRepository:
     UTIL_SITE_ID = 0
 
-    def __init__(self, root: Path):
+    def __init__(
+        self,
+        root: Path,
+        *,
+        compaction_threshold: int,
+        ttl_days: Optional[int],
+        document_length_limit: int,
+        room_events_limit: int,
+        room_sites_limit: int,
+        room_name_length: int = 14,
+    ):
         self.root = root
         self.root.mkdir(exist_ok=True)
+        self.compaction_threshold = compaction_threshold
+        self.ttl_days = ttl_days
+
+        self.room_events_limit = room_events_limit
+        self.room_sites_limit = room_sites_limit
+        self.room_name_length = room_name_length
+        self.document_length_limit = document_length_limit
 
         self.rooms: dict[str, Room] = {}
         self.events_at_last_flush: dict[str, int] = {}
 
     def create(self) -> Room:
         # Room might be GCed before it's claimed if no one connects to it
-        room_id = generate_phonetic_name(length=14)
-        room = Room(room_id)
+        room_id = generate_phonetic_name(length=self.room_name_length)
+        room = Room(
+            room_id,
+            events_limit=self.room_events_limit,
+            sites_limit=self.room_sites_limit,
+            document_length_limit=self.document_length_limit,
+        )
         self.rooms[room_id] = room
         return room
 
@@ -231,7 +271,13 @@ class RoomRepository:
         with gzip.open(self.room_path(room_id), "rt") as f:
             text: str = f.read()
 
-        room = create_from_text(room_id, text)
+        room = Room.from_text(
+            room_id,
+            text,
+            events_limit=self.room_events_limit,
+            sites_limit=self.room_sites_limit,
+            document_length_limit=self.document_length_limit,
+        )
         logger.info(f"Initialized room {room_id} with {room.events_len} events from disc")
         self.events_at_last_flush[room_id] = room.events_len
 
@@ -286,6 +332,14 @@ class RoomRepository:
     def room_path(self, room_id: str) -> Path:
         return self.root / f"{room_id}.txt.gz"
 
+    async def try_compact(self, room_id: str):
+        if room_id not in self.rooms:
+            return
+
+        room = self.rooms[room_id]
+        if room.events_len > self.compaction_threshold:
+            await self.compact_room(room_id)
+
     async def compact_room(self, room_id: str):
         if room_id not in self.rooms:
             return
@@ -304,9 +358,11 @@ class RoomRepository:
         saved_rooms |= set(self.rooms.keys())
         return len(saved_rooms)
 
-    def purge_stale_rooms(self, ttl_days: int) -> None:
+    def purge_stale_rooms(self) -> None:
+        if self.ttl_days is None:
+            return
         now = time.time()
-        ttl_seconds = ttl_days * 24 * 60 * 60
+        ttl_seconds = self.ttl_days * 24 * 60 * 60
         for p in self.root.iterdir():
             mtime = now - p.stat().st_mtime
             if mtime > ttl_seconds:
@@ -316,14 +372,14 @@ class RoomRepository:
 
 def test_from_text():
     text = "Hello, World!"
-    room = create_from_text(generate_phonetic_name(), text)
+    room = Room.from_text(generate_phonetic_name(), text, events_limit=100, sites_limit=10, document_length_limit=100)
     materialized_text = room.materialize()
     assert materialized_text == text
 
 
 def test_memory_usage():
     tracemalloc.start()
-    room = Room("test", events_limit=1_000_000)
+    room = Room("test", events_limit=1_000_000, sites_limit=20, document_length_limit=1_000_000)
 
     for i in range(250_000):
         room._append_events([CrdtEventModel(type=EventType.insert, gid=GlobalIdModel(counter=i, siteId=0), char="a")])
