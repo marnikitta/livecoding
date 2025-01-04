@@ -253,6 +253,7 @@ def main(
     room_events_limit = room_compaction_threshold + document_length_limit
     app = LivecodingApp(
         data_root=data_root,
+        document_length_limit=document_length_limit,
         room_compaction_threshold=room_compaction_threshold,
         room_events_limit=room_events_limit,
         room_ttl_days=room_ttl_days,
