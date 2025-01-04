@@ -225,21 +225,33 @@ def main(
             envvar="HOST", help="The hostname or IP address where the server will run (e.g., 'localhost' or '0.0.0.0')"
         ),
     ] = "localhost",
-    port: Annotated[int, typer.Option(envvar="PORT", help="The port number the server will listen on ")] = 5000,
+    port: Annotated[
+        int, typer.Option(envvar="PORT", help="The port number the server will listen on", min=1, max=65535)
+    ] = 5000,
     data_root: Annotated[
         Path,
         typer.Option(
             envvar="DATA_ROOT",
             help="The directory to store documents. If it doesn't exist, it will be created on first run",
+            file_okay=False,
+            dir_okay=True,
         ),
-    ] = Path("./data"),
+    ] = Path("data/"),
     document_length_limit: Annotated[
-        int, typer.Option(envvar="DOCUMENT_LENGTH_LIMIT", help="The maximum allowed size of a document, in characters")
+        int,
+        typer.Option(
+            envvar="DOCUMENT_LENGTH_LIMIT", help="The maximum allowed size of a document, in characters", min=0
+        ),
     ] = 25_000,
     room_ttl_days: Annotated[
         int,
-        typer.Option(envvar="ROOM_TTL_DAYS", help="The number of days a room can remain inactive before being deleted"),
+        typer.Option(
+            envvar="ROOM_TTL_DAYS",
+            help="The number of days a room can remain inactive before being deleted. Set to -1 to disable room deletion",
+            min=-1,
+        ),
     ] = 30,
+    no_static: Annotated[bool, typer.Option(envvar="NO_STATIC", help="Disable serving static files")] = False,
 ):
     """
     Live coding app server
@@ -256,7 +268,8 @@ def main(
         document_length_limit=document_length_limit,
         room_compaction_threshold=room_compaction_threshold,
         room_events_limit=room_events_limit,
-        room_ttl_days=room_ttl_days,
+        room_ttl_days=room_ttl_days if room_ttl_days > -1 else None,
+        serve_static=not no_static,
     )
 
     uvicorn.run(
