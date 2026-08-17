@@ -20,6 +20,20 @@ export class GlobalId {
     }
 }
 
+/**
+ * Stable string key for a global id, for comparison and deduplication.
+ *
+ * Do not string-coerce a gid instead. Ids that arrive over the wire are plain JSON objects rather than
+ * GlobalId instances, so GlobalId.prototype.toString does not apply to them: coercion quietly yields
+ * "[object Object]" and makes every id compare equal.
+ *
+ * @param {GlobalId|{counter: number, siteId: number}|null} gid
+ * @return {string}
+ */
+export function gidKey(gid) {
+    return gid ? `${gid.counter}@${gid.siteId}` : "-";
+}
+
 export class CharEntry {
     /**
      * @param {string} c
@@ -326,6 +340,58 @@ export class CRDTDocument {
         return position
     }
 
+
+    /**
+     * The gid of the character immediately left of `offset`, or null if the offset is before every
+     * visible character. This is how a caret is put on the wire: a gid needs no transformation
+     * against concurrent edits, because it stays valid forever and survives deletion as a tombstone.
+     *
+     * Returns null instead of throwing on a bad offset. Presence is decoration; it must never be able
+     * to take down an editing session.
+     *
+     * @param {number} offset
+     * @return {GlobalId|null}
+     */
+    offsetToGid(offset) {
+        let position;
+        try {
+            position = this.getPosition(offset);
+        } catch (e) {
+            console.warn(`Cannot anchor offset ${offset}`, e);
+            return null;
+        }
+
+        for (let i = position - 1; i >= 0; i--) {
+            if (this.entries[i].visible) {
+                return this.entries[i].gid;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Inverse of {@link offsetToGid}: the offset just right of the anchor character. A null gid means
+     * the start of the document. Returns null when the gid is unknown, which happens legitimately when
+     * a cursor referencing another site's character overtakes that character's own broadcast.
+     *
+     * @param {GlobalId|null} gid
+     * @return {number|null}
+     */
+    gidToOffset(gid) {
+        if (!gid) {
+            return 0;
+        }
+
+        const position = this.findGid(gid);
+        if (position === -1) {
+            return null;
+        }
+
+        const entry = this.entries[position];
+        // A tombstoned anchor still pins the caret to where that character used to be
+        return this.getPrefixLength(position) + (entry.visible ? entry.c.length : 0);
+    }
 
     /**
      * @param {number} from

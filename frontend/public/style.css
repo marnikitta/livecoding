@@ -257,3 +257,26 @@ a:hover {
 .cm-editor .cm-lineNumbers {
     min-width: 2rem;
 }
+
+/* Other people's carets. Deliberately not blinking: a blinking bar reads as your own insertion point,
+   and these are not places you can type. Per-site color arrives as an inline style, since the palette
+   lives in allColors in lib/theme.js. Keep that array and --color-sites-* above in sync. */
+.cm-remote-cursor {
+    display: inline-block;
+    width: 0;
+    height: 1.2em;
+    vertical-align: text-bottom;
+    border-left: 2px solid;
+    margin-left: -1px;
+    margin-right: -1px;
+    pointer-events: none;
+}
+
+.cm-remote-selection {
+    border-radius: 2px;
+}
+
+.cm-remote--dimmed {
+    /* matches .online-sites__site--hidden: the site's tab is in the background */
+    opacity: 50%;
+}

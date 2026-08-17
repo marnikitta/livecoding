@@ -146,6 +146,9 @@ class LivecodingApp:
                     await self.room_repository.try_compact(room.room_id)
                 elif msg.sitePresence is not None:
                     await room.apply_presence(msg.sitePresence, sender=site_id)
+                elif msg.siteCursor is not None:
+                    # Deliberately no try_compact: cursors are never appended to the event log
+                    await room.apply_cursor(msg.siteCursor, sender=site_id)
                 else:
                     raise ValueError(f"Invalid message: {msg}")
         except FullLogException:

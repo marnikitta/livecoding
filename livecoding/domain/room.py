@@ -13,6 +13,7 @@ from starlette.websockets import WebSocketState, WebSocketDisconnect
 from livecoding.domain.document import CrdtDocument, CrdtEventInternal, GlobalIdInternal
 from livecoding.domain.message import (
     WsMessage,
+    SiteCursor,
     SiteDisconnected,
     CrdtEventModel,
     SitePresence,
@@ -28,6 +29,9 @@ class Site:
     def __init__(self, site_id: int, websocket: WebSocket):
         self.site_id = site_id
         self.last_presence: Optional[SitePresence] = None
+        # Replaced in place, never accumulated, so cursor traffic costs O(1) per site and never
+        # touches the event log
+        self.last_cursor: Optional[SiteCursor] = None
         self._websocket = websocket
 
     async def send_message(self, message: WsMessage):
@@ -144,6 +148,8 @@ class Room:
             other_site = self.sites[other_site_id]
             if other_site.last_presence is not None:
                 await site.send_message(WsMessage(sitePresence=other_site.last_presence))
+            if other_site.last_cursor is not None:
+                await site.send_message(WsMessage(siteCursor=other_site.last_cursor))
 
     def get_model_events(self, offset: int = 0) -> list[CrdtEventModel]:
         return [CrdtEventModel.from_internal(e) for e in self._events[offset:]]
@@ -178,6 +184,12 @@ class Room:
         assert presence.siteId == sender, "Hello must be sent by the site"
         self.sites[presence.siteId].last_presence = presence
         await self.broadcast(WsMessage(sitePresence=presence))
+
+    async def apply_cursor(self, cursor: SiteCursor, sender: int):
+        assert cursor.siteId == sender, "Cursor must be sent by the site"
+        self.sites[sender].last_cursor = cursor
+        # Unlike presence, the sender does not need its own cursor echoed back
+        await self.broadcast(WsMessage(siteCursor=cursor), sender)
 
     async def broadcast(self, message: WsMessage, sender: Optional[int] = None):
         for site in list(self.sites.values()):

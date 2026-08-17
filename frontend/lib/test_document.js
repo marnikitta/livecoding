@@ -1,4 +1,4 @@
-import {CRDTDocument, CRDTEvent, GlobalId, PlainUpdate} from "./document.js";
+import {CRDTDocument, CRDTEvent, gidKey, GlobalId, PlainUpdate} from "./document.js";
 
 
 function testInsertion() {
@@ -308,8 +308,99 @@ function testRtlAndCombiningMarks() {
     console.assert(other.getText() === text, "RTL/combining text must replicate verbatim");
 }
 
+// Cursor anchors: a caret is put on the wire as the gid of the character to its left, so that it needs
+// no transformation against concurrent edits.
+function testCursorAnchorRoundTrip() {
+    let document = new CRDTDocument();
+    document.applyPlainUpdate(0, 0, "abracadabra", 0);
+
+    for (let offset = 0; offset <= "abracadabra".length; offset++) {
+        let gid = document.offsetToGid(offset);
+        console.assert(document.gidToOffset(gid) === offset,
+            `offset ${offset} round-tripped to ${document.gidToOffset(gid)}`);
+    }
+
+    // Nothing to the left of offset 0, which is what a null gid means on the wire.
+    console.assert(document.offsetToGid(0) === null);
+    console.assert(document.gidToOffset(null) === 0);
+}
+
+function testCursorAnchorSurvivesConcurrentInsert() {
+    let document = new CRDTDocument();
+    let other = new CRDTDocument();
+    other.applyEvents(document.applyPlainUpdate(0, 0, "abracadabra", 0));
+
+    // A caret sitting after "abra" on the remote replica.
+    let gid = other.offsetToGid(4);
+    console.assert(document.gidToOffset(gid) === 4);
+
+    // Someone types ahead of it. The caret must stay glued to its character, not slide.
+    other.applyEvents(document.applyPlainUpdate(0, 0, "XYZ", 0));
+    console.assert(document.gidToOffset(gid) === 7, `got ${document.gidToOffset(gid)}`);
+    console.assert(other.gidToOffset(gid) === 7, `replica got ${other.gidToOffset(gid)}`);
+}
+
+function testCursorAnchorSurvivesDeletedAnchor() {
+    let document = new CRDTDocument();
+    document.applyPlainUpdate(0, 0, "abracadabra", 0);
+
+    let gid = document.offsetToGid(4);
+    // Delete the anchor character itself. The tombstone pins the caret where it used to be.
+    document.applyPlainUpdate(3, 4, "", 0);
+    console.assert(document.getText() === "abrcadabra");
+    console.assert(document.gidToOffset(gid) === 3, `got ${document.gidToOffset(gid)}`);
+}
+
+function testCursorAnchorUnknownGid() {
+    let document = new CRDTDocument();
+    document.applyPlainUpdate(0, 0, "abra", 0);
+
+    // A cursor can overtake the events it references, and a hostile client can invent one outright.
+    // Neither may throw.
+    console.assert(document.gidToOffset(new GlobalId(999999, 99)) === null);
+}
+
+function testCursorAnchorAstral() {
+    let document = new CRDTDocument();
+    document.applyPlainUpdate(0, 0, "a😀b", 0);
+
+    // Offsets stay in UTF-16 code units, so the caret after the emoji is at 3.
+    let gid = document.offsetToGid(3);
+    console.assert(document.gidToOffset(gid) === 3, `got ${document.gidToOffset(gid)}`);
+    console.assert(document.offsetToGid(1) !== null);
+}
+
+// Entries built from incoming events hold plain JSON gids, not GlobalId instances. Anything that keys
+// on a gid has to survive that, or cursors anchored in text the other side typed all look identical and
+// stop being broadcast, which shows up as presence working in one direction only.
+function testGidKeyOnWireObjects() {
+    let document = new CRDTDocument();
+    // Exactly what arrives from the socket: JSON.parse output, no prototype.
+    let wireEvents = JSON.parse(JSON.stringify([
+        new CRDTEvent("insert", new GlobalId(1, 7), "a", null),
+        new CRDTEvent("insert", new GlobalId(2, 7), "b", new GlobalId(1, 7)),
+        new CRDTEvent("insert", new GlobalId(3, 7), "c", new GlobalId(2, 7)),
+    ]));
+    document.applyEvents(wireEvents);
+    console.assert(document.getText() === "abc");
+
+    let keys = [0, 1, 2, 3].map(offset => gidKey(document.offsetToGid(offset)));
+    console.assert(new Set(keys).size === 4, `every offset must key differently, got ${JSON.stringify(keys)}`);
+    console.assert(keys[0] === "-", `offset 0 has no anchor, got ${keys[0]}`);
+    console.assert(keys[1] === "1@7", `got ${keys[1]}`);
+
+    // A locally created id and the wire form of the same id must agree.
+    console.assert(gidKey(new GlobalId(1, 7)) === gidKey({counter: 1, siteId: 7}));
+}
+
 export function runAllTests() {
     console.log("Running document tests")
+    testGidKeyOnWireObjects();
+    testCursorAnchorRoundTrip();
+    testCursorAnchorSurvivesConcurrentInsert();
+    testCursorAnchorSurvivesDeletedAnchor();
+    testCursorAnchorUnknownGid();
+    testCursorAnchorAstral();
     testAstralInsert();
     testAstralPositions();
     testAstralDelete();

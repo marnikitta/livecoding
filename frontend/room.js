@@ -1,8 +1,9 @@
 import {Compartment, EditorState, Transaction} from "@codemirror/state";
 
 import {EditorView} from "@codemirror/view";
-import {CRDTDocument, CRDTEvent} from "./lib/document.js";
+import {CRDTDocument, CRDTEvent, gidKey, GlobalId} from "./lib/document.js";
 import {allColors, defaultExtensions, getLanguageByExtension} from "./lib/theme.js";
+import {clearAllRemoteCursors, clearRemoteCursor, remoteCursors, setRemoteCursor} from "./lib/presence.js";
 import {shallowRef} from "vue";
 
 /**
@@ -17,6 +18,10 @@ const RoomState = {
     editing: 'editing',
     terminated: 'terminated'
 };
+
+// Cursor broadcasts are capped at one per this many milliseconds. Continuous movement costs at most
+// ~16 messages a second, each a few dozen bytes, and none of them ever reaches the room's event log.
+const CURSOR_THROTTLE_MS = 60;
 
 
 export default {
@@ -40,7 +45,7 @@ export default {
           <li
               class="online-sites__site"
               :class="{'online-sites__site--hidden': !site.visible,
-              ['online-sites__site--color-' + site.colorIdx]: true}"
+              ['online-sites__site--color-' + (site.colorIdx + 1)]: true}"
               v-for="[s, site] in sites"
               :key="s">
             {{ site.name }}<span v-if="siteId === s">&nbsp;(you)</span>
@@ -110,6 +115,22 @@ export default {
 
     created() {
         document.addEventListener('visibilitychange', this.visibilityChange, false);
+
+        // Deliberately outside data(): these are the source of truth for remote carets and Vue's proxy
+        // has no business walking CRDT identifiers on every keystroke, the same reason this.socket is
+        // kept off the reactive object.
+        /**
+         * @type {Map<number, {anchor: ?GlobalId, head: ?GlobalId}>}
+         */
+        this.remoteCursorGids = new Map();
+        /**
+         * Sites whose anchors we could not resolve yet, retried once new events land.
+         * @type {Set<number>}
+         */
+        this.pendingCursorSites = new Set();
+        this.cursorSendTimer = null;
+        this.lastSentCursor = null;
+        this.lastCursorSentTs = 0;
     },
 
     async mounted() {
@@ -140,6 +161,8 @@ export default {
                 ]),
                 getLanguageByExtension(this.extension),
                 ...defaultExtensions,
+                // Room-only. defaultExtensions is shared with the read-only demo editor on the home page
+                remoteCursors(),
                 EditorView.updateListener.of(update => {
                     try {
                         this.onViewUpdate(update)
@@ -200,11 +223,16 @@ export default {
         roomState(newValue) {
             let readonly = newValue !== RoomState.editing
 
-            this.view.dispatch({
-                effects:
-                    [this.readonlyCompartment.reconfigure([EditorView.editable.of(!readonly),
-                        EditorState.readOnly.of(readonly)])]
-            })
+            let effects = [this.readonlyCompartment.reconfigure([EditorView.editable.of(!readonly),
+                EditorState.readOnly.of(readonly)])]
+
+            if (newValue === RoomState.terminated) {
+                // Riding the watcher rather than dispatching straight from terminateEverything, which
+                // can be reached from inside an editor update, where dispatching is not allowed
+                effects.push(clearAllRemoteCursors.of(null))
+            }
+
+            this.view.dispatch({effects})
         }
     },
     methods: {
@@ -217,6 +245,8 @@ export default {
             sessionStorage.setItem(this.roomId, JSON.stringify({name}));
 
             this.roomState = RoomState.editing
+            // Publish a cursor straight away, so others see the joiner without waiting for a keystroke
+            this.broadcastCursor()
         },
         terminateEverything(compactionRequired = false) {
             if (this.roomState === RoomState.terminated) {
@@ -225,6 +255,14 @@ export default {
             }
             console.error("Terminating everything");
             this.sites.clear();
+            this.remoteCursorGids.clear();
+            this.pendingCursorSites.clear();
+            this.lastSentCursor = null;
+            this.lastCursorSentTs = 0;
+            if (this.cursorSendTimer !== null) {
+                clearTimeout(this.cursorSendTimer);
+                this.cursorSendTimer = null;
+            }
             this.compactionRequired = compactionRequired
             this.siteId = null;
             this.roomState = RoomState.terminated;
@@ -263,9 +301,19 @@ export default {
                     "visible": presence.visible,
                     "colorIdx": presence.siteId % allColors.length
                 })
+                if (this.remoteCursorGids.has(presence.siteId)) {
+                    // Redraw so a backgrounded tab dims its caret too
+                    this.resolveRemoteCursors([presence.siteId])
+                }
+            } else if ("siteCursor" in msg) {
+                this.applyRemoteCursor(msg.siteCursor)
             } else if ("siteDisconnected" in msg) {
                 console.info("Site disconnected", msg.siteDisconnected)
-                this.sites.delete(msg.siteDisconnected.siteId)
+                let siteId = msg.siteDisconnected.siteId
+                this.sites.delete(siteId)
+                this.remoteCursorGids.delete(siteId)
+                this.pendingCursorSites.delete(siteId)
+                this.view.dispatch({effects: clearRemoteCursor.of(siteId)})
             } else if ("heartbit" in msg) {
                 this.lastHeartbitTs = Date.now()
             } else if ("compactionRequired" in msg) {
@@ -296,12 +344,127 @@ export default {
                 });
                 this.view.dispatch(t);
             }
+
+            // New characters may be exactly the ones an unresolved anchor was waiting for. Cursors that
+            // already resolved need no attention: the editor maps their offsets through the changes above.
+            if (this.pendingCursorSites.size > 0) {
+                this.resolveRemoteCursors([...this.pendingCursorSites])
+            }
         },
         /**
          * @param {CRDTEvent[]} events
          */
         broadcastCrdtEvents(events) {
             this.socket.send(JSON.stringify({crdtEvents: events}))
+        },
+        /**
+         * Remember where another site is, and try to put it on screen.
+         *
+         * @param {{siteId: number, anchor: ?GlobalId, head: ?GlobalId}} cursor
+         */
+        applyRemoteCursor(cursor) {
+            if (cursor.siteId === this.siteId) {
+                return
+            }
+
+            this.remoteCursorGids.set(cursor.siteId, {
+                anchor: cursor.anchor ?? null,
+                head: cursor.head ?? null
+            })
+            this.resolveRemoteCursors([cursor.siteId])
+        },
+        /**
+         * Turn stored global ids into editor offsets and push them into the view.
+         *
+         * An id can be unknown for a moment: every site has its own broadcast loop on the server, so a
+         * cursor anchored on another site's character can arrive before that character does. Such a site
+         * keeps whatever position it had and is retried once the missing events land.
+         *
+         * @param {number[]} siteIds
+         */
+        resolveRemoteCursors(siteIds) {
+            let effects = []
+
+            for (const siteId of siteIds) {
+                let gids = this.remoteCursorGids.get(siteId)
+                if (gids === undefined) {
+                    continue
+                }
+
+                let anchor = this.document.gidToOffset(gids.anchor)
+                let head = this.document.gidToOffset(gids.head)
+                if (anchor === null || head === null) {
+                    this.pendingCursorSites.add(siteId)
+                    continue
+                }
+                this.pendingCursorSites.delete(siteId)
+
+                let site = this.sites.get(siteId)
+                effects.push(setRemoteCursor.of({
+                    siteId: siteId,
+                    anchor: anchor,
+                    head: head,
+                    colorIdx: siteId % allColors.length,
+                    visible: site === undefined ? true : site.visible
+                }))
+            }
+
+            if (effects.length > 0) {
+                this.view.dispatch({effects})
+            }
+        },
+        scheduleCursorBroadcast() {
+            if (this.roomState !== RoomState.editing || this.cursorSendTimer !== null) {
+                return
+            }
+
+            // Leading edge: a move that follows a pause goes out immediately, which is the common case
+            // and the one where latency is actually felt. Only continuous movement is deferred, and
+            // then only by what is left of the window, so the cap holds without ever adding a fixed
+            // delay to a single click or keystroke.
+            let sinceLastSend = Date.now() - this.lastCursorSentTs
+            if (sinceLastSend >= CURSOR_THROTTLE_MS) {
+                this.broadcastCursor()
+                return
+            }
+
+            this.cursorSendTimer = setTimeout(() => {
+                this.cursorSendTimer = null
+                this.broadcastCursor()
+            }, CURSOR_THROTTLE_MS - sinceLastSend)
+        },
+        /**
+         * Anchor the local selection to the characters it sits next to and send it.
+         *
+         * Global ids rather than offsets, so the receiver never has to transform anything against
+         * concurrent edits: an id stays valid forever and survives deletion as a tombstone.
+         */
+        broadcastCursor() {
+            if (this.roomState !== RoomState.editing || this.siteId === null) {
+                return
+            }
+
+            try {
+                let range = this.view.state.selection.main
+                let anchor = this.document.offsetToGid(range.anchor)
+                let head = this.document.offsetToGid(range.head)
+
+                // gidKey, not string interpolation: gids received over the wire are plain objects and
+                // would all coerce to "[object Object]", making every position look unchanged
+                let signature = `${gidKey(anchor)}/${gidKey(head)}`
+                if (signature === this.lastSentCursor) {
+                    return
+                }
+                this.lastSentCursor = signature
+                this.lastCursorSentTs = Date.now()
+
+                this.socket.send(JSON.stringify({
+                    siteCursor: {siteId: this.siteId, anchor: anchor, head: head}
+                }))
+            } catch (e) {
+                // Presence is decoration. It must never be able to take down an editing session.
+                console.warn("Failed to broadcast cursor", e)
+            }
         },
         /**
          * @param {Transaction} transaction
@@ -337,6 +500,10 @@ export default {
                 if (events.length > 0) {
                     this.broadcastCrdtEvents(events)
                 }
+            }
+
+            if (update.selectionSet || update.docChanged) {
+                this.scheduleCursorBroadcast()
             }
         },
         /**

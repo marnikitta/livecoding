@@ -59,6 +59,23 @@ class SitePresence(BaseModel):
     visible: bool
 
 
+class SiteCursor(BaseModel):
+    """
+    Where a site's caret and selection are, anchored to the document instead of to character offsets.
+
+    Both gids point at the character immediately to the left of the position, so `None` means the very
+    start of the document. Anchoring this way needs no transformation against concurrent edits: a gid
+    stays valid forever, and a deleted anchor survives as a tombstone.
+
+    The server never resolves these gids. They are opaque routing data, so a bogus one is a rendering
+    no-op on the receiving side rather than a desync.
+    """
+
+    siteId: int
+    anchor: Optional[GlobalIdModel] = None
+    head: Optional[GlobalIdModel] = None
+
+
 class SiteDisconnected(BaseModel):
     siteId: int
 
@@ -70,6 +87,7 @@ class SetSiteId(BaseModel):
 class WsMessage(BaseModel):
     setSiteId: Optional[SetSiteId] = None
     sitePresence: Optional[SitePresence] = None
+    siteCursor: Optional[SiteCursor] = None
     siteDisconnected: Optional[SiteDisconnected] = None
     crdtEvents: Optional[list[CrdtEventModel]] = None
     heartbit: Optional[bool] = None
