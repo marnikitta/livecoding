@@ -10,7 +10,7 @@ import typer
 import uvicorn
 from fastapi import FastAPI, WebSocket, HTTPException, APIRouter
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 from starlette.responses import FileResponse, PlainTextResponse
 from starlette.websockets import WebSocketDisconnect
 
@@ -152,6 +152,11 @@ class LivecodingApp:
             logger.error(f"Room {room.room_id} is full")
         except WebSocketDisconnect:
             pass
+        except ValidationError:
+            # A message we cannot parse means this site's document has diverged from ours. Dropping the
+            # message would leave the two silently out of sync, so close the connection and let the client
+            # reload from scratch.
+            logger.exception(f"Site {site_id} sent an unparsable message to room {room.room_id}. Disconnecting")
         finally:
             await room.disconnect(site_id)
             if heartbit_task is not None:

@@ -80,6 +80,19 @@ export class CRDTEvent {
 }
 
 /**
+ * Number of Unicode code points in a string. Differs from `.length` (UTF-16 code units) for
+ * astral characters such as emoji, which occupy two code units.
+ *
+ * @param {string} s
+ * @return {number}
+ */
+function codePointLength(s) {
+    let count = 0;
+    for (const _ of s) count++;
+    return count;
+}
+
+/**
  * @param {PlainUpdate[]} updates
  * @return {PlainUpdate[]}
  */
@@ -193,9 +206,11 @@ export class CRDTDocument {
             return [];
         }
 
-        if (char.length !== 1) {
-            throw new Error(`Char must have a single character. Got: ${char}`);
-
+        // The CRDT unit is a single Unicode code point, not a UTF-16 code unit. Python (the server) iterates
+        // strings by code point, so splitting on code units here would produce lone surrogates that are not
+        // representable in JSON/UTF-8 and get rejected on the wire.
+        if (codePointLength(char) !== 1) {
+            throw new Error(`Char must have a single code point. Got: ${char}`);
         }
 
         let position
@@ -270,12 +285,15 @@ export class CRDTDocument {
 
         this.entries[pos].visible = false;
         this.appliedOps.add(opStr);
+        // Entries are addressed in UTF-16 code units, matching CodeMirror positions. An entry holding an
+        // astral code point spans two of them.
+        const charLength = this.entries[pos].c.length;
         if (this.cachedPosition > pos) {
-            this.cachedLength -= 1;
+            this.cachedLength -= charLength;
         }
 
         let length = this.getPrefixLength(pos);
-        return [new PlainUpdate(length, length + 1, "")];
+        return [new PlainUpdate(length, length + charLength, "")];
     }
 
     /**
@@ -293,11 +311,12 @@ export class CRDTDocument {
 
         for (; length < prefixLength && position < this.entries.length; position++) {
             if (this.entries[position].visible) {
-                length += 1;
+                length += this.entries[position].c.length;
             }
         }
 
         if (length !== prefixLength) {
+            // Also catches a position landing inside a surrogate pair, which must never happen.
             throw new Error("Invalid prefix length");
         }
 
@@ -329,7 +348,7 @@ export class CRDTDocument {
             if (this.entries[i].visible) {
                 this.delete(this.entries[i].gid);
                 result.push(new CRDTEvent(DELETE_OPERATION, this.entries[i].gid, null, null));
-                removedChars--;
+                removedChars -= this.entries[i].c.length;
             }
         }
 
@@ -337,7 +356,11 @@ export class CRDTDocument {
             throw new Error("Invalid to position. Not enough characters to delete");
         }
 
-        for (let i = 0; i < value.length; i++) {
+        // Iterate by code point so astral characters stay intact. Indexing with value[i] would split
+        // them into lone surrogates, which cannot be serialized to JSON and desync the server.
+        const chars = Array.from(value);
+        let offset = 0;
+        for (let i = 0; i < chars.length; i++) {
             let afterGid
             if (entriesFrom + i === -1) {
                 afterGid = null;
@@ -345,9 +368,10 @@ export class CRDTDocument {
                 afterGid = this.entries[entriesFrom + i].gid;
             }
             let gid = new GlobalId(this.maxCounter + 1, siteId);
-            let char = value[i];
+            let char = chars[i];
             let insertEvent = this.insert(char, gid, afterGid)[0];
-            console.assert(insertEvent.from === from + i)
+            console.assert(insertEvent.from === from + offset)
+            offset += char.length;
 
             result.push(new CRDTEvent(INSERT_OPERATION, gid, char, afterGid));
         }

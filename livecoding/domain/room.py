@@ -377,6 +377,31 @@ def test_from_text():
     assert materialized_text == text
 
 
+def test_from_text_unicode():
+    # One event per code point, so astral characters survive as whole characters and the result is
+    # always encodable to UTF-8 (a lone surrogate would not be).
+    for text in ["a😀b", "𝕏 = 𝔽", "שלום world", "👨‍👩‍👧", "日本語", "café"]:
+        room = Room.from_text(
+            generate_phonetic_name(), text, events_limit=100, sites_limit=10, document_length_limit=100
+        )
+        assert room.materialize() == text
+        room.materialize().encode("utf-8")
+        assert room.events_len == len(text)
+
+
+def test_reject_lone_surrogate():
+    # What a UTF-16-indexing client would send for an emoji. It must never reach the document,
+    # because such a string cannot be persisted or broadcast.
+    import pydantic
+
+    for bad in ['{"char": "\\ud83d", "type": "insert", "gid": {"counter": 1, "siteId": 1}}']:
+        try:
+            CrdtEventModel.model_validate_json(bad)
+            raise AssertionError("lone surrogate must be rejected")
+        except pydantic.ValidationError:
+            pass
+
+
 def test_memory_usage():
     tracemalloc.start()
     room = Room("test", events_limit=1_000_000, sites_limit=20, document_length_limit=1_000_000)
